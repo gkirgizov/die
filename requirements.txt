@@ -6,3 +6,5 @@ matplotlib
 seaborn
 
 gymnasium
+
+pytest
