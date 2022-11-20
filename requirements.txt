@@ -1,0 +1,8 @@
+numpy
+scipy
+xarray
+
+matplotlib
+seaborn
+
+gymnasium
