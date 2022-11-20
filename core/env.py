@@ -1,15 +1,11 @@
-from typing import Optional, Union, List, Tuple, TypeVar, Sequence
+from typing import Optional, Union, List, Tuple, TypeVar
 
 import numpy as np
 import xarray as da
 import gymnasium as gym
 
+from core.base_types import ActType, ObsType, MaskType
 
-# ActType = TypeVar('ActType')
-# ObsType = TypeVar('ObsType')
-ActType = da.DataArray
-ObsType = da.DataArray
-MaskType = da.DataArray  # Single-channel medium mask
 RenderFrame = TypeVar('RenderFrame')
 
 
