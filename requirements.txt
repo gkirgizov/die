@@ -1,6 +1,7 @@
 numpy
 scipy
 xarray
+xbatcher
 
 matplotlib
 seaborn
