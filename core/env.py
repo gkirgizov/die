@@ -1,12 +1,35 @@
-from typing import Optional, Union, List, Tuple, TypeVar
+from dataclasses import dataclass
+from typing import Optional, Union, List, Tuple, TypeVar, Callable
 
 import numpy as np
 import xarray as da
 import gymnasium as gym
 
-from core.base_types import ActType, ObsType, MaskType
+from core.base_types import ActType, ObsType, MaskType, Operator, BiOperator, CostOperator
 
 RenderFrame = TypeVar('RenderFrame')
+
+"""
+Plan
+- [ ] some basic data init ENVs per channels for tests YET minimal
+- [ ] test data init
+- [ ] plotting NB: all tests are isolated visual cases, really
+
+- [ ] agent move
+- [ ] MockConstAgent
+- [ ] test agent moving
+
+- [ ] test agent feeding & life cycle
+- [ ] test medium diffusion
+- [ ] test deposit with communication
+"""
+
+# TODO:
+@dataclass
+class Dynamics:
+    op_action_cost: CostOperator
+    rate_feed: float
+
 
 
 class Env(gym.Env[ObsType, ActType]):
@@ -17,7 +40,7 @@ class Env(gym.Env[ObsType, ActType]):
     def _init_medium_array(field_size: Tuple[int, int]) -> ObsType:
         # TODO: init data
         # TODO: init agents
-        channels = ('agents', 'agent-food', 'env-food', 'chem1')
+        channels = ('agents', 'agent_food', 'env_food', 'chem1')
         name = 'medium'
 
         shape = (*field_size, len(channels))
@@ -28,8 +51,8 @@ class Env(gym.Env[ObsType, ActType]):
         agents_ratio = 0.05  # ratio of cells with agents
 
         medium = da.DataArray(
-            dims=('x', 'y', 'channels'),
-            coords={'x': xs, 'y': ys, 'channels': channels},
+            dims=('channel', 'x', 'y'),
+            coords={'x': xs, 'y': ys, 'channel': channels},
             name=name,
         )
         return medium
@@ -44,18 +67,20 @@ class Env(gym.Env[ObsType, ActType]):
         ys = np.linspace(0, 1, field_size[1])
 
         medium = da.DataArray(
-            dims=('x', 'y', 'channels'),
-            coords={'x': xs, 'y': ys, 'channels': channels},
+            dims=('channel', 'x', 'y'),
+            coords={'x': xs, 'y': ys, 'channel': channels},
             name=name,
         )
         return medium
 
     def __init__(self, field_size: Tuple[int, int]):
         self.medium = self._init_medium_array(field_size)
+        self.dynamics = Dynamics()
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         self._agent_move(action)
         self._agent_act_on_medium(action)
+        self._agent_consume_stock(action)
 
         self._agent_feed()
         self._agent_lifecycle()
@@ -93,10 +118,18 @@ class Env(gym.Env[ObsType, ActType]):
 
     def _agent_act_on_medium(self, action: ActType):
         """Act on medium & consume required internal resource."""
-        pass
+        amount1 = action.sel(channel='deposit1')
+        self.medium.loc[dict(channel='chem1')] += amount1
+
+    def _agent_consume_stock(self, action: ActType):
+        consumed = self.dynamics.op_action_cost(action)
+        self.medium.loc[dict(channel='agent_food')] -= consumed
 
     def _agent_feed(self):
         """Gains food from environment"""
+        # TODO:
+        env_stock = self.medium.sel(channel='env_food')
+        gained = self.dynamics.rate_feed * env_stock
         pass
 
     def _agent_lifecycle(self):
