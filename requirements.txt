@@ -2,6 +2,7 @@ numpy
 scipy
 xarray
 xbatcher
+perlin_noise
 
 matplotlib
 seaborn
