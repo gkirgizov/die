@@ -53,7 +53,7 @@ class DataInitializer:
         return self
 
     def with_chem(self, threshold: float = 0.1):
-        self._channels['chem1'] = self._mask(self._get_perlin(), threshold)
+        self._channels['chem1'] = self._mask(self._get_perlin(octaves=24), threshold)
         return self
 
     def build(self) -> np.ndarray:
