@@ -3,14 +3,14 @@ from typing import Tuple
 import numpy as np
 from perlin_noise import PerlinNoise
 
-from core.env import Env
+from core.base_types import medium_channels
 
 
 class DataInitializer:
     def __init__(self, field_size: Tuple[int, int]):
         self._size = field_size
         self._channels = {chan: np.zeros(field_size)
-                          for chan in Env.medium_channels}
+                          for chan in medium_channels}
 
     def _mask(self, sampled: np.ndarray, mask_above_threshold: float = 1.0) -> np.ndarray:
         mask = sampled < mask_above_threshold
@@ -50,6 +50,10 @@ class DataInitializer:
 
     def with_food_perlin(self, threshold: float = 0.25):
         self._channels['env_food'] = self._mask(self._get_perlin(), threshold)
+        return self
+
+    def with_chem(self, threshold: float = 0.1):
+        self._channels['chem1'] = self._mask(self._get_perlin(), threshold)
         return self
 
     def build(self) -> np.ndarray:

@@ -5,7 +5,7 @@ import numpy as np
 import xarray as da
 import gymnasium as gym
 
-from core.base_types import ActType, ObsType, MaskType, CostOperator
+from core.base_types import ActType, ObsType, MaskType, CostOperator, medium_channels, action_channels
 from core.data_init import DataInitializer
 
 RenderFrame = TypeVar('RenderFrame')
@@ -23,6 +23,9 @@ Plan
 - [ ] test agent feeding & life cycle
 - [ ] test medium diffusion
 - [ ] test deposit with communication
+
+- [ ] advanced dynamic vis (see https://docs.xarray.dev/en/stable/user-guide/plotting.html)
+
 """
 
 # TODO:
@@ -36,12 +39,10 @@ class Env(gym.Env[ObsType, ActType]):
     # TODO: maybe use Dataset with aligned `agents` and `medium` DataArrays
     #  with channels: x, y, food ??
 
-    medium_channels = ('agents', 'agent_food', 'env_food', 'chem1')
-    action_channels = ('dist', 'turn', 'deposit1')
-
     @staticmethod
-    def _init_medium_array(field_size: Tuple[int, int]) -> ObsType:
-        channels = Env.medium_channels
+    def init_medium_array(field_size: Tuple[int, int],
+                          init_data: Optional[np.ndarray] = None) -> ObsType:
+        channels = list(medium_channels)
         name = 'medium'
 
         shape = (*field_size, len(channels))
@@ -49,10 +50,11 @@ class Env(gym.Env[ObsType, ActType]):
         ys = np.linspace(0, 1, field_size[1])
 
         # Parameters
-        init_data = DataInitializer(field_size)\
-            .with_agents(ratio=0.05) \
-            .with_food_perlin(threshold=0.1) \
-            .build()
+        if init_data is None:
+            init_data = DataInitializer(field_size)\
+                .with_agents(ratio=0.05) \
+                .with_food_perlin(threshold=0.1) \
+                .build()
 
         medium = da.DataArray(
             data=init_data,
@@ -63,8 +65,8 @@ class Env(gym.Env[ObsType, ActType]):
         return medium
 
     @staticmethod
-    def _init_agential_array(field_size: Tuple[int, int]) -> ActType:
-        channels = Env.action_channels
+    def init_agential_array(field_size: Tuple[int, int]) -> ActType:
+        channels = list(action_channels)
         name = 'agents'
 
         shape = (*field_size, len(channels))
@@ -72,6 +74,7 @@ class Env(gym.Env[ObsType, ActType]):
         ys = np.linspace(0, 1, field_size[1])
 
         medium = da.DataArray(
+            data=np.zeros(shape, dtype=np.float),
             dims=('channel', 'x', 'y'),
             coords={'x': xs, 'y': ys, 'channel': channels},
             name=name,
@@ -79,7 +82,7 @@ class Env(gym.Env[ObsType, ActType]):
         return medium
 
     def __init__(self, field_size: Tuple[int, int]):
-        self.medium = self._init_medium_array(field_size)
+        self.medium = self.init_medium_array(field_size)
         self.dynamics = Dynamics()  # TODO
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
