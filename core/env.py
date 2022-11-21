@@ -1,18 +1,19 @@
 from dataclasses import dataclass
-from typing import Optional, Union, List, Tuple, TypeVar, Callable
+from typing import Optional, Union, List, Tuple, TypeVar
 
 import numpy as np
 import xarray as da
 import gymnasium as gym
 
-from core.base_types import ActType, ObsType, MaskType, Operator, BiOperator, CostOperator
+from core.base_types import ActType, ObsType, MaskType, CostOperator
+from core.data_init import DataInitializer
 
 RenderFrame = TypeVar('RenderFrame')
 
 """
 Plan
-- [ ] some basic data init ENVs per channels for tests YET minimal
-- [ ] test data init
+- [x] some basic data init ENVs per channels for tests YET minimal
+- [ ] test data init: plot channels
 - [ ] plotting NB: all tests are isolated visual cases, really
 
 - [ ] agent move
@@ -31,16 +32,16 @@ class Dynamics:
     rate_feed: float
 
 
-
 class Env(gym.Env[ObsType, ActType]):
     # TODO: maybe use Dataset with aligned `agents` and `medium` DataArrays
     #  with channels: x, y, food ??
 
+    medium_channels = ('agents', 'agent_food', 'env_food', 'chem1')
+    action_channels = ('dist', 'turn', 'deposit1')
+
     @staticmethod
     def _init_medium_array(field_size: Tuple[int, int]) -> ObsType:
-        # TODO: init data
-        # TODO: init agents
-        channels = ('agents', 'agent_food', 'env_food', 'chem1')
+        channels = Env.medium_channels
         name = 'medium'
 
         shape = (*field_size, len(channels))
@@ -48,9 +49,13 @@ class Env(gym.Env[ObsType, ActType]):
         ys = np.linspace(0, 1, field_size[1])
 
         # Parameters
-        agents_ratio = 0.05  # ratio of cells with agents
+        init_data = DataInitializer(field_size)\
+            .with_agents(ratio=0.05) \
+            .with_food_perlin(threshold=0.1) \
+            .build()
 
         medium = da.DataArray(
+            data=init_data,
             dims=('channel', 'x', 'y'),
             coords={'x': xs, 'y': ys, 'channel': channels},
             name=name,
@@ -59,7 +64,7 @@ class Env(gym.Env[ObsType, ActType]):
 
     @staticmethod
     def _init_agential_array(field_size: Tuple[int, int]) -> ActType:
-        channels = ('dist', 'turn', 'deposit1')
+        channels = Env.action_channels
         name = 'agents'
 
         shape = (*field_size, len(channels))
@@ -75,7 +80,7 @@ class Env(gym.Env[ObsType, ActType]):
 
     def __init__(self, field_size: Tuple[int, int]):
         self.medium = self._init_medium_array(field_size)
-        self.dynamics = Dynamics()
+        self.dynamics = Dynamics()  # TODO
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         self._agent_move(action)
