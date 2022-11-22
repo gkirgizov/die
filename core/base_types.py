@@ -19,4 +19,5 @@ Operator = Callable[[da.DataArray], da.DataArray]
 BiOperator = Callable[[da.DataArray], da.DataArray]
 
 medium_channels = ('agents', 'agent_food', 'env_food', 'chem1')
-action_channels = ('dist', 'turn', 'deposit1')
+# action_channels = ('dist', 'turn', 'deposit1')
+action_channels = ('dx', 'dy', 'deposit1')

@@ -36,11 +36,8 @@ class Dynamics:
 
     @staticmethod
     def default_cost(action: ActType):
-        # TODO: vectorize multiply
-        cost = \
-            0.5 * action.sel(channel='deposit1') + \
-            0.25 * action.sel(channel='dist') + \
-            0.25 * action.sel(channel='turn')
+        dist = np.linalg.norm(action.sel(channel=['dx', 'dy']), axis=0)
+        cost = 0.5 * action.sel(channel='deposit1') + 0.25 * dist
         return cost
 
 
@@ -54,7 +51,7 @@ class Env(gym.Env[ObsType, ActType]):
         channels = list(medium_channels)
         name = 'medium'
 
-        shape = (*field_size, len(channels))
+        shape = (len(channels), *field_size)
         xs = np.linspace(0, 1, field_size[0])
         ys = np.linspace(0, 1, field_size[1])
 
@@ -78,12 +75,12 @@ class Env(gym.Env[ObsType, ActType]):
         channels = list(action_channels)
         name = 'agents'
 
-        shape = (*field_size, len(channels))
+        shape = (len(channels), *field_size)
         xs = np.linspace(0, 1, field_size[0])
         ys = np.linspace(0, 1, field_size[1])
 
         medium = da.DataArray(
-            data=np.zeros(shape, dtype=np.float),
+            data=np.zeros(shape, dtype=np.float32),
             dims=('channel', 'x', 'y'),
             coords={'x': xs, 'y': ys, 'channel': channels},
             name=name,
@@ -132,7 +129,23 @@ class Env(gym.Env[ObsType, ActType]):
     def _agent_move(self, action: ActType):
         """Builds movement transformation for `agents` channels of the medium
         based on agents' provisioned action."""
-        pass
+        xv, yv = self._meshgrid()
+        dx = action.sel(channel='dx')
+        dy = action.sel(channel='dy')
+        xnew = xv + dx
+        ynew = yv + dy
+
+        # Vectorized version
+
+        # Compute new coordinates
+        coords = self._meshgrid()
+        delta = action.sel(channel=['dx', 'dy'])
+        agent_pos_upd = self._get_agent_mask() * (coords + delta)
+
+        # Select the cells by new coordinates
+        self.medium.sel(method='nearest')
+
+        # Update agent positions by these coordinates
 
     def _agent_act_on_medium(self, action: ActType):
         """Act on medium & consume required internal resource."""
@@ -163,6 +176,12 @@ class Env(gym.Env[ObsType, ActType]):
 
     def _get_masked_medium(self, mask: MaskType) -> ObsType:
         pass
+
+    def _meshgrid(self) -> Tuple[np.ndarray, np.ndarray]:
+        xc = self.medium.coords['x'].values
+        yc = self.medium.coords['y'].values
+        return np.meshgrid(xc, yc)
+
 
 
 if __name__ == '__main__':
