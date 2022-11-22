@@ -13,7 +13,7 @@ RenderFrame = TypeVar('RenderFrame')
 """
 Plan
 - [x] some basic data init ENVs per channels for tests YET minimal
-- [ ] test data init: plot channels
+- [x] test data init: plot channels
 - [ ] plotting NB: all tests are isolated visual cases, really
 
 - [ ] agent move
@@ -28,11 +28,20 @@ Plan
 
 """
 
-# TODO:
+
 @dataclass
 class Dynamics:
     op_action_cost: CostOperator
-    rate_feed: float
+    rate_feed: float  # TODO: maybe do lambda taking into account input?
+
+    @staticmethod
+    def default_cost(action: ActType):
+        # TODO: vectorize multiply
+        cost = \
+            0.5 * action.sel(channel='deposit1') + \
+            0.25 * action.sel(channel='dist') + \
+            0.25 * action.sel(channel='turn')
+        return cost
 
 
 class Env(gym.Env[ObsType, ActType]):
@@ -83,7 +92,8 @@ class Env(gym.Env[ObsType, ActType]):
 
     def __init__(self, field_size: Tuple[int, int]):
         self.medium = self.init_medium_array(field_size)
-        self.dynamics = Dynamics()  # TODO
+        self.dynamics = Dynamics(op_action_cost=Dynamics.default_cost,
+                                 rate_feed=0.1)
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         self._agent_move(action)

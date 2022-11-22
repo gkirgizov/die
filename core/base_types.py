@@ -8,8 +8,10 @@ import xarray as da
 ActType = da.DataArray
 ObsType = da.DataArray
 
-MaskType = Union[np.ndarray, da.DataArray]  # Single-channel medium mask
-CostType = Union[np.ndarray, da.DataArray]  # Single-channel DataArray
+Array = Union[np.ndarray, da.DataArray]
+Array1C = Array  # Single-channel 2D array
+MaskType = Array1C
+CostType = Array1C
 
 CostOperator = Callable[[ActType], CostType]
 
