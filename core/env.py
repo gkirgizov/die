@@ -16,8 +16,10 @@ Plan
 - [x] some basic data init ENVs per channels for tests YET minimal
 - [x] test data init: plot channels
 - [ ] plotting NB: all tests are isolated visual cases, really
+      maybe with some statistical tests *over the image*
 
-- [ ] agent move
+- [ ] agent lifecycle
+- [x] agent move async
 - [ ] MockConstAgent
 - [ ] test agent moving
 
@@ -61,12 +63,15 @@ class Env(gym.Env[ObsType, ActType]):
                                  rate_feed=0.1)
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
-        self._agent_move(action)
+        self._agent_feed()
         self._agent_act_on_medium(action)
         self._agent_consume_stock(action)
-
-        self._agent_feed()
         self._agent_lifecycle()
+
+        # NB: only agents that are alive (after lifecycle step) will move
+        # TODO: do I deposit trace on old locations or new locations?
+        # self._agent_move(action)
+        self._agent_move_async(action)
 
         self._medium_resource_dynamics()
         self._medium_diffuse()
@@ -88,21 +93,6 @@ class Env(gym.Env[ObsType, ActType]):
         """Defines agent-independent inflow & outflow of resource."""
         pass
 
-    def _get_agent_coord(self, dx=0, dy=0):
-        # Compute new coordinates
-        xv, yv = self._meshgrid()
-        agmask = self._get_agent_mask
-        mask_inds_x, mask_inds_y = self._get_agent_indices
-        xpos = agmask * (xv + dx)
-        ypos = agmask * (yv + dy)
-
-        # Vectorized version
-        # coords = np.stack(self._meshgrid())
-        # delta = action.sel(channel=['dx', 'dy'])
-        # agent_pos_upd = self._get_agent_mask * (coords + delta)
-
-        return xpos, ypos
-
     @property
     def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
         return self._get_agent_mask.values.nonzero()
@@ -118,26 +108,25 @@ class Env(gym.Env[ObsType, ActType]):
         for ix, iy in self._iter_agents(shuffle=True):
             ixy = dict(x=ix, y=iy)
             # Get all medium & movement data
-            medium_data = self.medium[ixy]
-            dx, dy, deposit = action[ixy].values
+            agent_action = action[ixy]
+            dx, dy, deposit = agent_action.values
 
             # Get actual agent coords (from just indices)
-            x = medium_data.coords['x'].values
-            y = medium_data.coords['y'].values
+            x = agent_action.coords['x'].values
+            y = agent_action.coords['y'].values
             # Compute new pos
-            new_x = x + dx
-            new_y = y + dy
-            cxy = dict(x=new_x, y=new_y)
+            cxy = dict(x=x + dx, y=y + dy)
 
-            # Update agent positions by these coordinates
-            # self.medium[ixy] = 0.  # TODO: any other 'default' value?
-            # self.medium[ixy].loc[dict(channel=)]
-            # TODO: work with agents array separately! It's simpler
-            self.agents.loc[cxy] = self.agents[ixy]
-            self.agents[ixy] = 0
+            # Update agents
+            self.agents.loc[cxy] = self.agents[ixy]  # move agent data to new position
+            self.agents[ixy] = 0.  # reset old agent position
 
-            pass
+            # Update medium by action: Deposit chemical trace
+            # old_medium_data = self.medium[ixy]
+            # TODO: do I deposit trace on old locations or new locations?
+            # self.medium.loc[cxy].loc[dict(channel='chem1')] += deposit
 
+    # TODO: try vectorized movement?
     def _agent_move(self, action: ActType):
         """Builds movement transformation for `agents` channels of the medium
         based on agents' provisioned action."""
@@ -165,6 +154,21 @@ class Env(gym.Env[ObsType, ActType]):
         # TODO: how to assign given different coords??
         self.agents[new_agent_medium.coords] = agent_data
 
+    def _get_agent_coord(self, dx=0, dy=0):
+        # Compute new coordinates
+        xv, yv = self._meshgrid()
+        agmask = self._get_agent_mask
+        mask_inds_x, mask_inds_y = self._get_agent_indices
+        xpos = agmask * (xv + dx)
+        ypos = agmask * (yv + dy)
+
+        # Vectorized version
+        # coords = np.stack(self._meshgrid())
+        # delta = action.sel(channel=['dx', 'dy'])
+        # agent_pos_upd = self._get_agent_mask * (coords + delta)
+
+        return xpos, ypos
+
     def _agent_act_on_medium(self, action: ActType):
         """Act on medium & consume required internal resource."""
         amount1 = action.sel(channel='deposit1')
@@ -176,10 +180,12 @@ class Env(gym.Env[ObsType, ActType]):
 
     def _agent_feed(self):
         """Gains food from environment"""
-        # TODO:
         env_stock = self.medium.sel(channel='env_food')
+        # TODO: what's best gain?
         gained = self.dynamics.rate_feed * env_stock
-        pass
+        # TODO: maybe coord-aligned summation will do that for me?
+        self.agents.loc[dict(channel='agent_food')] += gained
+        self.medium.loc[dict(channel='env_food')] -= gained
 
     def _agent_lifecycle(self):
         """Dies if consumed all internal stock,
