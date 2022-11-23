@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Union, List, Tuple, TypeVar
+from typing import Optional, Union, List, Tuple, TypeVar, Sequence
 
 import numpy as np
 import xarray as da
@@ -103,7 +103,7 @@ class Env(gym.Env[ObsType, ActType]):
         self._medium_resource_dynamics()
         self._medium_diffuse()
 
-        obs = self._agent_sense()
+        obs = self._get_sensed_medium
 
         # TODO: total reward? ending conditions? etc.
 
@@ -120,32 +120,82 @@ class Env(gym.Env[ObsType, ActType]):
         """Defines agent-independent inflow & outflow of resource."""
         pass
 
-    def _agent_sense(self) -> ObsType:
-        """Apply neighbourhood mask."""
-        mask = self._get_sense_mask()
-        visible_medium = self._get_masked_medium(mask)
-        return visible_medium
+    def _get_agent_coord(self, dx=0, dy=0):
+        # Compute new coordinates
+        xv, yv = self._meshgrid()
+        agmask = self._get_agent_mask
+        mask_inds_x, mask_inds_y = self._get_agent_indices
+        xpos = agmask * (xv + dx)
+        ypos = agmask * (yv + dy)
+
+        # Vectorized version
+        # coords = np.stack(self._meshgrid())
+        # delta = action.sel(channel=['dx', 'dy'])
+        # agent_pos_upd = self._get_agent_mask * (coords + delta)
+
+        return xpos, ypos
+
+    @property
+    def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
+        return self._get_agent_mask.values.nonzero()
+
+    def _iter_agents(self, shuffle: bool = True) -> Sequence[Tuple[int, int]]:
+        xs, ys = self._get_agent_indices
+        agent_inds = list(zip(xs, ys))
+        if shuffle:
+            np.random.default_rng().shuffle(agent_inds)  # in-place
+        return agent_inds
+
+    def _agent_move_async(self, action: ActType):
+        for ix, iy in self._iter_agents(shuffle=True):
+            ixy = dict(x=ix, y=iy)
+            # Get all medium & movement data
+            medium_data = self.medium[ixy]
+            dx, dy, deposit = action[ixy].values
+
+            # Get actual agent coords (from just indices)
+            x = medium_data.coords['x'].values
+            y = medium_data.coords['y'].values
+            # Compute new pos
+            new_x = x + dx
+            new_y = y + dy
+            cxy = dict(x=new_x, y=new_y)
+
+            # Update agent positions by these coordinates
+            # self.medium[ixy] = 0.  # TODO: any other 'default' value?
+            # self.medium[ixy].loc[dict(channel=)]
+            # TODO: work with agents array separately! It's simpler
+            self.agents.loc[cxy] = self.agents[ixy]
+            self.agents[ixy] = 0
+
+            pass
 
     def _agent_move(self, action: ActType):
         """Builds movement transformation for `agents` channels of the medium
         based on agents' provisioned action."""
-        xv, yv = self._meshgrid()
+
+        # Masked coords of old positions (in small form, without nans)
+        old_xpos, old_ypos = self._get_agent_coord()
+
+        # Compute new positions: we get them in the
         dx = action.sel(channel='dx')
         dy = action.sel(channel='dy')
-        xnew = xv + dx
-        ynew = yv + dy
+        xpos = old_xpos + dx
+        ypos = old_ypos + dy
 
-        # Vectorized version
-
-        # Compute new coordinates
-        coords = self._meshgrid()
-        delta = action.sel(channel=['dx', 'dy'])
-        agent_pos_upd = self._get_agent_mask() * (coords + delta)
-
+        # TODO: is correspondence b/w old agent data & new agent is preserved?
         # Select the cells by new coordinates
-        self.medium.sel(method='nearest')
-
-        # Update agent positions by these coordinates
+        #  NB: DataArary.sel doesn't allow direct assignment
+        #  that's why we use 2-step with `.loc[coords] = ...`
+        # TODO: can actually try just rounding to grid size step and indexing directly
+        new_agent_medium = self.medium.sel(x=xpos, y=ypos, method='nearest')
+        # Update agent positions by these coordinates:
+        #  erase agent channels from previous positions
+        agent_data = self._get_agents_medium
+        self.medium.loc[dict(channel=['agents', 'agent_food'])] = 0
+        #  write their data at new positions
+        # TODO: how to assign given different coords??
+        self.medium[new_agent_medium.coords] = agent_data
 
     def _agent_act_on_medium(self, action: ActType):
         """Act on medium & consume required internal resource."""
@@ -168,14 +218,23 @@ class Env(gym.Env[ObsType, ActType]):
         grows if has excess stock & favorable conditions."""
         pass
 
+    @property
     def _get_agent_mask(self) -> MaskType:
-        pass
+        return self.medium.sel(channel='agents') > 0
 
+    @property
     def _get_sense_mask(self) -> MaskType:
         pass
 
-    def _get_masked_medium(self, mask: MaskType) -> ObsType:
-        pass
+    @property
+    def _get_agents_medium(self) -> ObsType:
+        return self.medium.where(self._get_agent_mask)
+
+    @property
+    def _get_sensed_medium(self) -> ObsType:
+        """Apply agent neighbourhood mask to the medium to get "what agents see"."""
+        visible_medium = self.medium.where(self._get_sense_mask)
+        return visible_medium
 
     def _meshgrid(self) -> Tuple[np.ndarray, np.ndarray]:
         xc = self.medium.coords['x'].values
