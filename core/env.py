@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import Optional, Union, List, Tuple, TypeVar, Sequence
+from numbers import Number
+from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable
 
 import numpy as np
 import xarray as da
 import gymnasium as gym
 
-from core.base_types import ActType, ObsType, MaskType, CostOperator, medium_channels, action_channels
+from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator
 from core.data_init import DataInitializer
 
 RenderFrame = TypeVar('RenderFrame')
@@ -42,53 +43,50 @@ class Dynamics:
 
 
 class Env(gym.Env[ObsType, ActType]):
-    # TODO: maybe use Dataset with aligned `agents` and `medium` DataArrays
-    #  with channels: x, y, food ??
-
     @staticmethod
-    def init_medium_array(field_size: Tuple[int, int],
-                          init_data: Optional[np.ndarray] = None) -> ObsType:
-        channels = list(medium_channels)
-        name = 'medium'
-
+    def init_field_array(field_size: Tuple[int, int],
+                         channels: Sequence[Hashable],
+                         name: Optional[str] = None,
+                         init_data: Optional[Union[Number, np.ndarray]] = None) -> ObsType:
         shape = (len(channels), *field_size)
         xs = np.linspace(0, 1, field_size[0])
         ys = np.linspace(0, 1, field_size[1])
 
-        # Parameters
         if init_data is None:
-            init_data = DataInitializer(field_size)\
-                .with_agents(ratio=0.05) \
-                .with_food_perlin(threshold=0.1) \
-                .build()
+            init_data = 0
 
         medium = da.DataArray(
             data=init_data,
             dims=('channel', 'x', 'y'),
-            coords={'x': xs, 'y': ys, 'channel': channels},
+            coords={'x': xs, 'y': ys, 'channel': list(channels)},
             name=name,
         )
         return medium
 
-    @staticmethod
-    def init_agential_array(field_size: Tuple[int, int]) -> ActType:
-        channels = list(action_channels)
-        name = 'agents'
-
-        shape = (len(channels), *field_size)
-        xs = np.linspace(0, 1, field_size[0])
-        ys = np.linspace(0, 1, field_size[1])
-
-        medium = da.DataArray(
-            data=np.zeros(shape, dtype=np.float32),
-            dims=('channel', 'x', 'y'),
-            coords={'x': xs, 'y': ys, 'channel': channels},
-            name=name,
-        )
-        return medium
-
+    # TODO: maybe use Dataset with aligned `agents` and `medium` DataArrays
+    #  with channels: x, y, food ??
     def __init__(self, field_size: Tuple[int, int]):
-        self.medium = self.init_medium_array(field_size)
+        medium_init_data = DataInitializer(field_size, DataChannels.medium) \
+            .with_food_perlin(threshold=0.1) \
+            .build()
+        self.medium = self.init_field_array(field_size,
+                                            name='medium',
+                                            channels=DataChannels.medium,
+                                            init_data=medium_init_data)
+
+        agents_init_data = DataInitializer(field_size, DataChannels.agents) \
+            .with_agents(ratio=0.05) \
+            .build()
+        self.agents = self.init_field_array(field_size,
+                                            name='agents',
+                                            channels=DataChannels.agents,
+                                            init_data=agents_init_data)
+
+        # self.actions = self.init_medium_array(field_size,
+        #                                       name='actions',
+        #                                       channels=DataChannels.actions,
+        #                                       init_data=0.)
+
         self.dynamics = Dynamics(op_action_cost=Dynamics.default_cost,
                                  rate_feed=0.1)
 
@@ -192,10 +190,10 @@ class Env(gym.Env[ObsType, ActType]):
         # Update agent positions by these coordinates:
         #  erase agent channels from previous positions
         agent_data = self._get_agents_medium
-        self.medium.loc[dict(channel=['agents', 'agent_food'])] = 0
+        self.agents.loc[dict(channel=['agents', 'agent_food'])] = 0
         #  write their data at new positions
         # TODO: how to assign given different coords??
-        self.medium[new_agent_medium.coords] = agent_data
+        self.agents[new_agent_medium.coords] = agent_data
 
     def _agent_act_on_medium(self, action: ActType):
         """Act on medium & consume required internal resource."""
@@ -204,7 +202,7 @@ class Env(gym.Env[ObsType, ActType]):
 
     def _agent_consume_stock(self, action: ActType):
         consumed = self.dynamics.op_action_cost(action)
-        self.medium.loc[dict(channel='agent_food')] -= consumed
+        self.agents.loc[dict(channel='agent_food')] -= consumed
 
     def _agent_feed(self):
         """Gains food from environment"""
@@ -220,7 +218,7 @@ class Env(gym.Env[ObsType, ActType]):
 
     @property
     def _get_agent_mask(self) -> MaskType:
-        return self.medium.sel(channel='agents') > 0
+        return self.agents.sel(channel='agents') > 0
 
     @property
     def _get_sense_mask(self) -> MaskType:

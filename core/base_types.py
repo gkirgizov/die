@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable, Union, Sequence, Hashable
 
 import numpy as np
 import xarray as da
@@ -18,6 +18,11 @@ CostOperator = Callable[[ActType], CostType]
 Operator = Callable[[da.DataArray], da.DataArray]
 BiOperator = Callable[[da.DataArray], da.DataArray]
 
-medium_channels = ('agents', 'agent_food', 'env_food', 'chem1')
-# action_channels = ('dist', 'turn', 'deposit1')
-action_channels = ('dx', 'dy', 'deposit1')
+Channels = Sequence[Hashable]
+
+
+class DataChannels:
+    medium: Channels = ('env_food', 'chem1')
+    agents: Channels = ('agents', 'agent_food')
+    # action: Channels = ('dist', 'turn', 'deposit1')
+    actions: Channels = ('dx', 'dy', 'deposit1')

@@ -1,16 +1,15 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import numpy as np
 from perlin_noise import PerlinNoise
 
-from core.base_types import medium_channels
+from core.base_types import DataChannels, Channels
 
 
 class DataInitializer:
-    def __init__(self, field_size: Tuple[int, int]):
+    def __init__(self, field_size: Tuple[int, int], channels: Optional[Channels] = None):
         self._size = field_size
-        self._channels = {chan: np.zeros(field_size)
-                          for chan in medium_channels}
+        self._channels = {chan: np.zeros(field_size) for chan in channels or ()}
 
     def _mask(self, sampled: np.ndarray, mask_above_threshold: float = 1.0) -> np.ndarray:
         mask = sampled < mask_above_threshold

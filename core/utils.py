@@ -7,8 +7,11 @@ from xarray import plot
 from core.base_types import ActType, ObsType, MaskType, CostOperator
 
 
-def plot_medium(medium: ObsType, figsize=None):
-    rgb_data_to_plot = medium.sel(channel=['agents', 'env_food', 'chem1'])
+def plot_medium(medium: ObsType, agents: ObsType, figsize=None):
+    agents_data = agents.sel(channel='agents')
+    medium_data = medium.sel(channel=['env_food', 'chem1'])
+    rgb_data_to_plot = da.concat([agents_data, medium_data], dim='channel')
+
     cmap = 'viridis'
     artist = plot.imshow(rgb_data_to_plot,
                          rgb=medium.dims[0],
