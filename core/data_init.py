@@ -1,12 +1,37 @@
+from numbers import Number
+from numbers import Number
 from typing import Tuple, Optional
+from typing import Union, Sequence, Hashable
 
 import numpy as np
+import xarray as da
 from perlin_noise import PerlinNoise
 
-from core.base_types import DataChannels, Channels
+from core.base_types import Channels, DataChannels, ObsType, ActType
 
 
 class DataInitializer:
+
+    @staticmethod
+    def init_field_array(field_size: Tuple[int, int],
+                         channels: Sequence[Hashable],
+                         name: Optional[str] = None,
+                         init_data: Optional[Union[Number, np.ndarray]] = None) -> ObsType:
+        shape = (len(channels), *field_size)
+        xs = np.linspace(0, 1, field_size[0])
+        ys = np.linspace(0, 1, field_size[1])
+
+        if init_data is None:
+            init_data = 0
+
+        medium = da.DataArray(
+            data=init_data,
+            dims=('channel', 'x', 'y'),
+            coords={'x': xs, 'y': ys, 'channel': list(channels)},
+            name=name,
+        )
+        return medium
+
     def __init__(self, field_size: Tuple[int, int], channels: Optional[Channels] = None):
         self._size = field_size
         self._channels = {chan: np.zeros(field_size) for chan in channels or ()}
@@ -55,5 +80,12 @@ class DataInitializer:
         self._channels['chem1'] = self._mask(self._get_perlin(octaves=24), threshold)
         return self
 
-    def build(self) -> np.ndarray:
+    def build_numpy(self) -> np.ndarray:
         return np.stack(list(self._channels.values()))
+
+    def build(self, name: Optional[str] = None) -> ObsType:
+        data = self.build_numpy()
+        return DataInitializer.init_field_array(field_size=self._size,
+                                                channels=self._channels,
+                                                name=name,
+                                                init_data=data)

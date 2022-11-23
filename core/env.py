@@ -43,49 +43,19 @@ class Dynamics:
 
 
 class Env(gym.Env[ObsType, ActType]):
-    @staticmethod
-    def init_field_array(field_size: Tuple[int, int],
-                         channels: Sequence[Hashable],
-                         name: Optional[str] = None,
-                         init_data: Optional[Union[Number, np.ndarray]] = None) -> ObsType:
-        shape = (len(channels), *field_size)
-        xs = np.linspace(0, 1, field_size[0])
-        ys = np.linspace(0, 1, field_size[1])
-
-        if init_data is None:
-            init_data = 0
-
-        medium = da.DataArray(
-            data=init_data,
-            dims=('channel', 'x', 'y'),
-            coords={'x': xs, 'y': ys, 'channel': list(channels)},
-            name=name,
-        )
-        return medium
-
     # TODO: maybe use Dataset with aligned `agents` and `medium` DataArrays
     #  with channels: x, y, food ??
     def __init__(self, field_size: Tuple[int, int]):
-        medium_init_data = DataInitializer(field_size, DataChannels.medium) \
+        self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_food_perlin(threshold=0.1) \
-            .build()
-        self.medium = self.init_field_array(field_size,
-                                            name='medium',
-                                            channels=DataChannels.medium,
-                                            init_data=medium_init_data)
+            .build(name='medium')
 
-        agents_init_data = DataInitializer(field_size, DataChannels.agents) \
+        self.agents = DataInitializer(field_size, DataChannels.agents) \
             .with_agents(ratio=0.05) \
-            .build()
-        self.agents = self.init_field_array(field_size,
-                                            name='agents',
-                                            channels=DataChannels.agents,
-                                            init_data=agents_init_data)
+            .build(name='agents')
 
-        # self.actions = self.init_medium_array(field_size,
-        #                                       name='actions',
-        #                                       channels=DataChannels.actions,
-        #                                       init_data=0.)
+        # self.actions = DataInitializer(field_size, DataChannels.actions) \
+        #     .build(name='actions')
 
         self.dynamics = Dynamics(op_action_cost=Dynamics.default_cost,
                                  rate_feed=0.1)
