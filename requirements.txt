@@ -4,6 +4,7 @@ xarray
 xbatcher
 perlin_noise
 
+ipython
 matplotlib
 seaborn
 

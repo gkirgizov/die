@@ -41,13 +41,13 @@ class DataInitializer:
         return sampled * mask
 
     def _get_random(self, a=0., b=1.) -> np.ndarray:
-        return (b-a) * np.random.random_sample(self._size) + a
+        return (b-a) * np.random.random_sample(self._size).round(3) + a
 
     def _get_perlin(self, octaves: int = 8) -> np.ndarray:
         noise = PerlinNoise(octaves=octaves)
         xs = np.linspace(0, 1, self._size[0])
         ys = np.linspace(0, 1, self._size[1])
-        field = np.array([[noise((x, y)) for y in ys] for x in xs])
+        field = np.array([[noise((x, y)) for y in ys] for x in xs]).round(3)
         return field
 
     # TODO: get figue
@@ -64,6 +64,10 @@ class DataInitializer:
     def _add_masked(self, channel: str, data: np.ndarray):
         mask = self._channels[channel] > 0.
         self._channels[channel] += data * mask
+        return self
+
+    def with_noise(self, channel: str, a=0, b=1):
+        self._channels[channel] = self._get_random(a, b)
         return self
 
     def with_agents(self, ratio: float):
