@@ -7,7 +7,7 @@ import numpy as np
 import xarray as da
 from perlin_noise import PerlinNoise
 
-from core.base_types import Channels, DataChannels, ObsType, ActType
+from core.base_types import Channels, DataChannels, ObsType, ActType, MediumType
 
 
 class DataInitializer:
@@ -16,7 +16,7 @@ class DataInitializer:
     def init_field_array(field_size: Tuple[int, int],
                          channels: Sequence[Hashable],
                          name: Optional[str] = None,
-                         init_data: Optional[Union[Number, np.ndarray]] = None) -> ObsType:
+                         init_data: Optional[Union[Number, np.ndarray]] = None) -> MediumType:
         shape = (len(channels), *field_size)
         xs = np.linspace(0, 1, field_size[0])
         ys = np.linspace(0, 1, field_size[1])
@@ -87,7 +87,7 @@ class DataInitializer:
     def build_numpy(self) -> np.ndarray:
         return np.stack(list(self._channels.values()))
 
-    def build(self, name: Optional[str] = None) -> ObsType:
+    def build(self, name: Optional[str] = None) -> MediumType:
         data = self.build_numpy()
         return DataInitializer.init_field_array(field_size=self._size,
                                                 channels=self._channels,

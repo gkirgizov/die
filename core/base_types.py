@@ -1,4 +1,4 @@
-from typing import Callable, Union, Sequence, Hashable
+from typing import Callable, Union, Sequence, Hashable, Tuple
 
 import numpy as np
 import xarray as da
@@ -7,7 +7,8 @@ import xarray as da
 # ObsType = TypeVar('ObsType')
 ActType = da.DataArray
 AgtType = da.DataArray
-ObsType = da.DataArray
+MediumType = da.DataArray
+ObsType = Tuple[AgtType, MediumType]
 
 Array = Union[np.ndarray, da.DataArray]
 Array1C = Array  # Single-channel 2D array

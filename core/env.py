@@ -6,7 +6,7 @@ import numpy as np
 import xarray as da
 import gymnasium as gym
 
-from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType
+from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType
 from core.data_init import DataInitializer
 
 RenderFrame = TypeVar('RenderFrame')
@@ -174,11 +174,11 @@ class Env(gym.Env[ObsType, ActType]):
         pass
 
     @property
-    def _get_agents_medium(self) -> ObsType:
+    def _get_agents_medium(self) -> MediumType:
         return self.medium.where(self._get_agent_mask)
 
     @property
-    def _get_sensed_medium(self) -> ObsType:
+    def _get_sensed_medium(self) -> MediumType:
         """Apply agent neighbourhood mask to the medium to get "what agents see"."""
         visible_medium = self.medium.where(self._get_sense_mask)
         return visible_medium

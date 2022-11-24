@@ -4,10 +4,10 @@ import numpy as np
 import xarray as da
 from xarray import plot
 
-from core.base_types import ActType, ObsType, MaskType, CostOperator
+from core.base_types import ActType, ObsType, MaskType, CostOperator, MediumType, AgtType
 
 
-def plot_medium(medium: ObsType, agents: ObsType, figsize=None):
+def plot_medium(medium: MediumType, agents: AgtType, figsize=None):
     agents_data = agents.sel(channel='agents')
     medium_data = medium.sel(channel=['env_food', 'chem1'])
     rgb_data_to_plot = da.concat([agents_data, medium_data], dim='channel')
