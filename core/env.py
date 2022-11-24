@@ -6,7 +6,7 @@ import numpy as np
 import xarray as da
 import gymnasium as gym
 
-from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator
+from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType
 from core.data_init import DataInitializer
 
 RenderFrame = TypeVar('RenderFrame')
@@ -17,6 +17,7 @@ Plan
 - [x] test data init: plot channels
 - [ ] plotting NB: all tests are isolated visual cases, really
       maybe with some statistical tests *over the image*
+- [ ] make buffered update
 
 - [ ] agent lifecycle
 - [x] agent move async
@@ -59,8 +60,22 @@ class Env(gym.Env[ObsType, ActType]):
         # self.actions = DataInitializer(field_size, DataChannels.actions) \
         #     .build(name='actions')
 
+        self.buffer_agents = self.agents.copy(deep=True)
+        self.buffer_medium = self.medium.copy(deep=True)
+
         self.dynamics = Dynamics(op_action_cost=Dynamics.default_cost,
                                  rate_feed=0.1)
+
+    def _rotate_buffers(self, reset_data=0.):
+        tmp = self.agents
+        self.agents = self.buffer_agents
+        self.buffer_agents = tmp
+        self.buffer_agents = reset_data
+
+        tmp = self.medium
+        self.medium = self.buffer_medium
+        self.buffer_medium = tmp
+        self.buffer_medium = reset_data
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         self._agent_feed()
@@ -76,6 +91,7 @@ class Env(gym.Env[ObsType, ActType]):
         self._medium_resource_dynamics()
         self._medium_diffuse()
 
+        self._rotate_buffers()
         obs = self._get_sensed_medium
 
         # TODO: total reward? ending conditions? etc.
@@ -118,16 +134,15 @@ class Env(gym.Env[ObsType, ActType]):
             cxy = dict(x=x + dx, y=y + dy)
 
             # Update agents
-            self.agents.loc[cxy] = self.agents[ixy]  # move agent data to new position
-            self.agents[ixy] = 0.  # reset old agent position
+            self.buffer_agents.loc[cxy] = self.agents[ixy]  # move agent data to new position
 
             # Update medium by action: Deposit chemical trace
             # old_medium_data = self.medium[ixy]
             # TODO: do I deposit trace on old locations or new locations?
-            # self.medium.loc[cxy].loc[dict(channel='chem1')] += deposit
+            # self.buffer_medium.loc[cxy].loc[dict(channel='chem1')] += deposit
 
     # TODO: try vectorized movement?
-    def _agent_move(self, action: ActType):
+    def _agent_move(self, agents: AgtType, action: ActType):
         """Builds movement transformation for `agents` channels of the medium
         based on agents' provisioned action."""
 
@@ -149,10 +164,10 @@ class Env(gym.Env[ObsType, ActType]):
         # Update agent positions by these coordinates:
         #  erase agent channels from previous positions
         agent_data = self._get_agents_medium
-        self.agents.loc[dict(channel=['agents', 'agent_food'])] = 0
+        agents.loc[dict(channel=['agents', 'agent_food'])] = 0
         #  write their data at new positions
         # TODO: how to assign given different coords??
-        self.agents[new_agent_medium.coords] = agent_data
+        agents[new_agent_medium.coords] = agent_data
 
     def _get_agent_coord(self, dx=0, dy=0):
         # Compute new coordinates
@@ -172,11 +187,11 @@ class Env(gym.Env[ObsType, ActType]):
     def _agent_act_on_medium(self, action: ActType):
         """Act on medium & consume required internal resource."""
         amount1 = action.sel(channel='deposit1')
-        self.medium.loc[dict(channel='chem1')] += amount1
+        self.buffer_medium.loc[dict(channel='chem1')] += amount1
 
     def _agent_consume_stock(self, action: ActType):
         consumed = self.dynamics.op_action_cost(action)
-        self.agents.loc[dict(channel='agent_food')] -= consumed
+        self.buffer_agents.loc[dict(channel='agent_food')] -= consumed
 
     def _agent_feed(self):
         """Gains food from environment"""
@@ -184,8 +199,8 @@ class Env(gym.Env[ObsType, ActType]):
         # TODO: what's best gain?
         gained = self.dynamics.rate_feed * env_stock
         # TODO: maybe coord-aligned summation will do that for me?
-        self.agents.loc[dict(channel='agent_food')] += gained
-        self.medium.loc[dict(channel='env_food')] -= gained
+        self.buffer_agents.loc[dict(channel='agent_food')] += gained
+        self.buffer_medium.loc[dict(channel='env_food')] -= gained
 
     def _agent_lifecycle(self):
         """Dies if consumed all internal stock,
@@ -214,7 +229,6 @@ class Env(gym.Env[ObsType, ActType]):
         xc = self.medium.coords['x'].values
         yc = self.medium.coords['y'].values
         return np.meshgrid(xc, yc)
-
 
 
 if __name__ == '__main__':
