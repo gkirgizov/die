@@ -141,49 +141,6 @@ class Env(gym.Env[ObsType, ActType]):
             # TODO: do I deposit trace on old locations or new locations?
             # self.buffer_medium.loc[cxy].loc[dict(channel='chem1')] += deposit
 
-    # TODO: try vectorized movement?
-    def _agent_move(self, agents: AgtType, action: ActType):
-        """Builds movement transformation for `agents` channels of the medium
-        based on agents' provisioned action."""
-
-        # Masked coords of old positions (in small form, without nans)
-        old_xpos, old_ypos = self._get_agent_coord()
-
-        # Compute new positions: we get them in the
-        dx = action.sel(channel='dx')
-        dy = action.sel(channel='dy')
-        xpos = old_xpos + dx
-        ypos = old_ypos + dy
-
-        # TODO: is correspondence b/w old agent data & new agent is preserved?
-        # Select the cells by new coordinates
-        #  NB: DataArary.sel doesn't allow direct assignment
-        #  that's why we use 2-step with `.loc[coords] = ...`
-        # TODO: can actually try just rounding to grid size step and indexing directly
-        new_agent_medium = self.medium.sel(x=xpos, y=ypos, method='nearest')
-        # Update agent positions by these coordinates:
-        #  erase agent channels from previous positions
-        agent_data = self._get_agents_medium
-        agents.loc[dict(channel=['agents', 'agent_food'])] = 0
-        #  write their data at new positions
-        # TODO: how to assign given different coords??
-        agents[new_agent_medium.coords] = agent_data
-
-    def _get_agent_coord(self, dx=0, dy=0):
-        # Compute new coordinates
-        xv, yv = self._meshgrid()
-        agmask = self._get_agent_mask
-        mask_inds_x, mask_inds_y = self._get_agent_indices
-        xpos = agmask * (xv + dx)
-        ypos = agmask * (yv + dy)
-
-        # Vectorized version
-        # coords = np.stack(self._meshgrid())
-        # delta = action.sel(channel=['dx', 'dy'])
-        # agent_pos_upd = self._get_agent_mask * (coords + delta)
-
-        return xpos, ypos
-
     def _agent_act_on_medium(self, action: ActType):
         """Act on medium & consume required internal resource."""
         amount1 = action.sel(channel='deposit1')
