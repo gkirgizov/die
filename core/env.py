@@ -17,7 +17,7 @@ Plan
 - [x] test data init: plot channels
 - [ ] plotting NB: all tests are isolated visual cases, really
       maybe with some statistical tests *over the image*
-- [ ] make buffered update
+- [x] make buffered update
 
 - [ ] agent lifecycle
 - [x] agent move async
@@ -66,32 +66,32 @@ class Env(gym.Env[ObsType, ActType]):
         self.dynamics = Dynamics(op_action_cost=Dynamics.default_cost,
                                  rate_feed=0.1)
 
-    def _rotate_buffers(self, reset_data=0.):
+    def _rotate_agent_buffer(self, reset_data=0.):
         tmp = self.agents
         self.agents = self.buffer_agents
         self.buffer_agents = tmp
         self.buffer_agents = reset_data
 
+    def _rotate_medium_buffer(self, reset_data=0.):
         tmp = self.medium
         self.medium = self.buffer_medium
         self.buffer_medium = tmp
         self.buffer_medium = reset_data
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
+        """Each substep here leaves the world state valid and ready for the next substep."""
+
         self._agent_feed()
         self._agent_act_on_medium(action)
         self._agent_consume_stock(action)
         self._agent_lifecycle()
 
-        # NB: only agents that are alive (after lifecycle step) will move
-        # TODO: do I deposit trace on old locations or new locations?
-        # self._agent_move(action)
-        self._agent_move_async(action)
-
         self._medium_resource_dynamics()
         self._medium_diffuse()
 
-        self._rotate_buffers()
+        # NB: only agents that are alive (after lifecycle step) will move
+        self._agent_move_async(action)
+
         obs = self._get_sensed_medium
 
         # TODO: total reward? ending conditions? etc.
@@ -140,15 +140,16 @@ class Env(gym.Env[ObsType, ActType]):
             # old_medium_data = self.medium[ixy]
             # TODO: do I deposit trace on old locations or new locations?
             # self.buffer_medium.loc[cxy].loc[dict(channel='chem1')] += deposit
+        self._rotate_agent_buffer()
 
     def _agent_act_on_medium(self, action: ActType):
         """Act on medium & consume required internal resource."""
         amount1 = action.sel(channel='deposit1')
-        self.buffer_medium.loc[dict(channel='chem1')] += amount1
+        self.medium.loc[dict(channel='chem1')] += amount1
 
     def _agent_consume_stock(self, action: ActType):
         consumed = self.dynamics.op_action_cost(action)
-        self.buffer_agents.loc[dict(channel='agent_food')] -= consumed
+        self.agents.loc[dict(channel='agent_food')] -= consumed
 
     def _agent_feed(self):
         """Gains food from environment"""
@@ -156,8 +157,8 @@ class Env(gym.Env[ObsType, ActType]):
         # TODO: what's best gain?
         gained = self.dynamics.rate_feed * env_stock
         # TODO: maybe coord-aligned summation will do that for me?
-        self.buffer_agents.loc[dict(channel='agent_food')] += gained
-        self.buffer_medium.loc[dict(channel='env_food')] -= gained
+        self.agents.loc[dict(channel='agent_food')] += gained
+        self.medium.loc[dict(channel='env_food')] -= gained
 
     def _agent_lifecycle(self):
         """Dies if consumed all internal stock,
