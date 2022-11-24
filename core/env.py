@@ -5,9 +5,11 @@ from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable
 import numpy as np
 import xarray as da
 import gymnasium as gym
+from matplotlib import pyplot as plt
 
 from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType
 from core.data_init import DataInitializer
+from core.utils import plot_medium
 
 RenderFrame = TypeVar('RenderFrame')
 
@@ -72,13 +74,13 @@ class Env(gym.Env[ObsType, ActType]):
         tmp = self.agents
         self.agents = self.buffer_agents
         self.buffer_agents = tmp
-        self.buffer_agents = reset_data
+        self.buffer_agents[:] = reset_data
 
     def _rotate_medium_buffer(self, reset_data=0.):
         tmp = self.medium
         self.medium = self.buffer_medium
         self.buffer_medium = tmp
-        self.buffer_medium = reset_data
+        self.buffer_medium[:] = reset_data
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         """Each substep here leaves the world state valid and ready for the next substep."""
@@ -94,15 +96,16 @@ class Env(gym.Env[ObsType, ActType]):
         # NB: only agents that are alive (after lifecycle step) will move
         self._agent_move_async(action)
 
-        obs = self._get_sensed_medium
-
         # TODO: total reward? ending conditions? etc.
         reward = 0.
 
-        return (self.agents, obs), reward, False, False, {}
+        return self._get_current_obs, reward, False, False, {}
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
         pass
+
+    def plot(self, figsize=None):
+        plot_medium(self.medium, self.agents, figsize)
 
     def _medium_diffuse(self):
         """Applies per-channel diffusion, channel-specific."""
@@ -135,9 +138,13 @@ class Env(gym.Env[ObsType, ActType]):
             y = agent_action.coords['y'].values
             # Compute new pos
             cxy = dict(x=x + dx, y=y + dy)
+            # nearest_cxy = self.agents.sel(*cxy, method='nearest').coords
+            nearest_cxy = self.agents.sel(x=x + dx, y=y + dy, method='nearest').coords
+
+            # TODO: all these coords can be got in vectorized fashion? just write in buffer?
 
             # Update agents
-            self.buffer_agents.loc[cxy] = self.agents[ixy]  # move agent data to new position
+            self.buffer_agents.loc[nearest_cxy] = self.agents[ixy]  # move agent data to new position
 
             # Update medium by action: Deposit chemical trace
             # old_medium_data = self.medium[ixy]
@@ -186,10 +193,21 @@ class Env(gym.Env[ObsType, ActType]):
         visible_medium = self.medium.where(self._get_sense_mask)
         return visible_medium
 
+    @property
+    def _get_current_obs(self) -> ObsType:
+        return self.agents, self._get_sensed_medium
+
     def _meshgrid(self) -> Tuple[np.ndarray, np.ndarray]:
         xc = self.medium.coords['x'].values
         yc = self.medium.coords['y'].values
         return np.meshgrid(xc, yc)
+
+    def _meshstep(self) -> Tuple[float, float]:
+        xc = self.medium.coords['x'].values
+        yc = self.medium.coords['y'].values
+        dx = abs(xc[1] - xc[0])
+        dy = abs(yc[1] - yc[0])
+        return dx, dy
 
 
 if __name__ == '__main__':
