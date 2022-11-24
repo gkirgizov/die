@@ -7,7 +7,7 @@ import numpy as np
 import xarray as da
 from perlin_noise import PerlinNoise
 
-from core.base_types import Channels, DataChannels, ObsType, ActType, MediumType
+from core.base_types import Channels, DataChannels, ObsType, ActType, MediumType, AgtType
 
 
 class DataInitializer:
@@ -32,9 +32,26 @@ class DataInitializer:
         )
         return medium
 
-    def __init__(self, field_size: Tuple[int, int], channels: Optional[Channels] = None):
+    @staticmethod
+    def init_action_for(agents: AgtType, init_data=0.) -> ActType:
+        return DataInitializer.init_field_array(field_size=agents.shape[1:],
+                                                channels=DataChannels.actions,
+                                                name='actions',
+                                                init_data=init_data)
+
+    @staticmethod
+    def action_for(agents: AgtType) -> 'DataInitializer':
+        return DataInitializer(field_size=agents.shape[1:],
+                               channels=DataChannels.actions,
+                               name='actions')
+
+    def __init__(self,
+                 field_size: Tuple[int, int],
+                 channels: Optional[Channels] = None,
+                 name: Optional[str] = None):
         self._size = field_size
         self._channels = {chan: np.zeros(field_size) for chan in channels or ()}
+        self._name = name
 
     def _mask(self, sampled: np.ndarray, mask_above_threshold: float = 1.0) -> np.ndarray:
         mask = sampled < mask_above_threshold

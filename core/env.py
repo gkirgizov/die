@@ -19,11 +19,13 @@ Plan
       maybe with some statistical tests *over the image*
 - [x] make buffered update
 
-- [ ] agent lifecycle
 - [x] agent move async
-- [ ] MockConstAgent
+- [x] MockConstAgent
 - [ ] test agent moving
 
+- [ ] agent lifecycle
+- [ ] medium boundary conditions
+- [ ] ...
 - [ ] test agent feeding & life cycle
 - [ ] test medium diffusion
 - [ ] test deposit with communication
@@ -95,8 +97,9 @@ class Env(gym.Env[ObsType, ActType]):
         obs = self._get_sensed_medium
 
         # TODO: total reward? ending conditions? etc.
+        reward = 0.
 
-        return obs
+        return (self.agents, obs), reward, False, False, {}
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
         pass
