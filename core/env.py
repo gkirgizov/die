@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from numbers import Number
-from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable
+from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable, Dict
 
 import numpy as np
 import xarray as da
@@ -19,7 +19,7 @@ Plan
 - [x] test data init: plot channels
 - [ ] plotting NB: all tests are isolated visual cases, really
       maybe with some statistical tests *over the image*
-- [x] make buffered update
+- [ ] make buffered update more efficient
 
 - [x] agent move async
 - [x] MockConstAgent
@@ -53,12 +53,14 @@ class Env(gym.Env[ObsType, ActType]):
     # TODO: maybe use Dataset with aligned `agents` and `medium` DataArrays
     #  with channels: x, y, food ??
     def __init__(self, field_size: Tuple[int, int]):
+        self.coordgrid = self._get_meshgrid(field_size)
+
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_food_perlin(threshold=0.1) \
             .build(name='medium')
 
         self.agents = DataInitializer(field_size, DataChannels.agents) \
-            .with_agents(ratio=0.05) \
+            .with_agents(ratio=0.01) \
             .build(name='agents')
 
         # self.actions = DataInitializer(field_size, DataChannels.actions) \
@@ -94,7 +96,8 @@ class Env(gym.Env[ObsType, ActType]):
         self._medium_diffuse()
 
         # NB: only agents that are alive (after lifecycle step) will move
-        self._agent_move_async(action)
+        # self._agent_move_async(action)
+        self._agent_move(action)
 
         # TODO: total reward? ending conditions? etc.
         reward = 0.
@@ -105,6 +108,7 @@ class Env(gym.Env[ObsType, ActType]):
         pass
 
     def plot(self, figsize=None):
+        # TODO: consult aspect ratio
         plot_medium(self.medium, self.agents, figsize)
 
     def _medium_diffuse(self):
@@ -118,6 +122,33 @@ class Env(gym.Env[ObsType, ActType]):
     @property
     def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
         return self._get_agent_mask.values.nonzero()
+    @property
+    def _get_agent_indexer(self) -> Dict:
+        ixs, iys = self._get_agent_mask.values.nonzero()
+        # https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
+        pointwise_indexer = dict(x=da.DataArray(ixs),
+                                 y=da.DataArray(iys))
+        return pointwise_indexer
+
+    def _agent_move(self, action: ActType):
+        # Compute new positions
+        delta_coords = action.sel(channel=['dx', 'dy'])
+        agent_coords = self.coordgrid
+        # NB: that's an array of new coords indexed by old coords -- key step
+        new_coords_grid = agent_coords + delta_coords  # full grid
+
+        # Key step: elaborate approximate pointwise coordinate indexing
+        agent_inds = self._get_agent_indexer  # pointwise indexer
+        new_coords = new_coords_grid[agent_inds]
+        # TODO: here in principle can filter out already occupied cells
+        cell_indexer = dict(x=da.DataArray(new_coords[0]),
+                            y=da.DataArray(new_coords[1]))
+        new_cells = self.agents.sel(**cell_indexer, method='nearest')
+
+        # Move agents with their channels
+        self.buffer_agents.loc[new_cells.coords] = self.agents[agent_inds]
+
+        self._rotate_agent_buffer()
 
     def _iter_agents(self, shuffle: bool = True) -> Sequence[Tuple[int, int]]:
         xs, ys = self._get_agent_indices
@@ -137,19 +168,11 @@ class Env(gym.Env[ObsType, ActType]):
             x = agent_action.coords['x'].values
             y = agent_action.coords['y'].values
             # Compute new pos
-            cxy = dict(x=x + dx, y=y + dy)
-            # nearest_cxy = self.agents.sel(*cxy, method='nearest').coords
             nearest_cxy = self.agents.sel(x=x + dx, y=y + dy, method='nearest').coords
 
-            # TODO: all these coords can be got in vectorized fashion? just write in buffer?
-
             # Update agents
+            # TODO: all these coords can be got in vectorized fashion? just write in buffer?
             self.buffer_agents.loc[nearest_cxy] = self.agents[ixy]  # move agent data to new position
-
-            # Update medium by action: Deposit chemical trace
-            # old_medium_data = self.medium[ixy]
-            # TODO: do I deposit trace on old locations or new locations?
-            # self.buffer_medium.loc[cxy].loc[dict(channel='chem1')] += deposit
         self._rotate_agent_buffer()
 
     def _agent_act_on_medium(self, action: ActType):
@@ -197,10 +220,12 @@ class Env(gym.Env[ObsType, ActType]):
     def _get_current_obs(self) -> ObsType:
         return self.agents, self._get_sensed_medium
 
-    def _meshgrid(self) -> Tuple[np.ndarray, np.ndarray]:
-        xc = self.medium.coords['x'].values
-        yc = self.medium.coords['y'].values
-        return np.meshgrid(xc, yc)
+    @staticmethod
+    def _get_meshgrid(field_size: Sequence[int]) -> np.ndarray:
+        # NB: dim order is reversed in xarray
+        xcs = [np.linspace(0., 1., num=size) for size in reversed(field_size)]
+        coord_grid = np.stack(np.meshgrid(*xcs))
+        return coord_grid
 
     def _meshstep(self) -> Tuple[float, float]:
         xc = self.medium.coords['x'].values

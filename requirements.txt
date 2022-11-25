@@ -11,3 +11,4 @@ seaborn
 gymnasium
 
 pytest
+tqdm

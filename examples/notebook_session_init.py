@@ -32,7 +32,20 @@ medium, agents, action = get_test_fields((8, 6))
 plot_medium(medium, agents)
 plt.show()
 
-# Test methods
-pos = medium.sel(x=[0.13, 0.4], y=[0.15, 0.6], method='nearest')
+# Receipt for data assignment by approximate coords
+pos_range = medium.sel(x=[0.13, 0.4],
+                       y=[0.15, 0.6],
+                       method='nearest')
+# Pointwise
+# https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
+pos_pointwise = medium.sel(x=da.DataArray([0.13, 0.4], dims='z'),
+                           y=da.DataArray([0.15, 0.6], dims='z'),
+                           method='nearest')
+pos = pos_pointwise
+new_data = np.random.random(pos.shape).round(2)
+medium.loc[pos.coords] = new_data
+
+# Getting values
 float(action[dict(x=3,y=4)].sel(channel='deposit1').values)
+# Chained indexing for assignment
 action[dict(x=3,y=4)].loc[dict(channel='dx')]

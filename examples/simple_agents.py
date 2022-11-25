@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 from core.agent import ConstAgent, Agent, RandomAgent
 from core.env import Env
@@ -6,22 +7,23 @@ from core.env import Env
 
 def try_agent_action(agent: Agent,
                      field_size=(256, 256),
-                     iters=100,
+                     iters=200,
                      show_each=-1,
                      ):
     env = Env(field_size)
 
-    for i in range(1, iters+1):
+    for i in tqdm(range(1, iters+1)):
         obs = env._get_current_obs
         action = agent.forward(obs)
 
-        env._agent_move_async(action)
+        # env._agent_move_async(action)
+        env._agent_move(action)
         env._agent_act_on_medium(action)
 
         if show_each > 0 and i % show_each == 0:
-            print(f'iteration {i}')
-            # env.plot()
-            # plt.show()
+            print(f'drawing progress at iteration {i}')
+            env.plot()
+            plt.show()
 
 
 def try_const_agent(**kwargs):
@@ -30,10 +32,11 @@ def try_const_agent(**kwargs):
 
 
 def try_random_agent(**kwargs):
-    agent = RandomAgent(move_scale=0.05, deposit_scale=0.10)
-    try_agent_action(agent, show_each=2, **kwargs)
+    agent = RandomAgent(move_scale=0.01, deposit_scale=0.25)
+    try_agent_action(agent, show_each=20, **kwargs)
 
 
 if __name__ == '__main__':
     # try_const_agent()
-    try_random_agent(field_size=(128, 128))
+    # try_random_agent(field_size=(10, 8))
+    try_random_agent(field_size=(1024, 512))
