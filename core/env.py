@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from numbers import Number
@@ -6,7 +7,6 @@ from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable, Di
 import numpy as np
 import xarray as da
 import gymnasium as gym
-from matplotlib import pyplot as plt
 
 from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType, FoodOperator
 from core.data_init import DataInitializer
@@ -14,9 +14,10 @@ from core.utils import plot_medium
 
 RenderFrame = TypeVar('RenderFrame')
 
+
 class BoundaryCondition(Enum):
     cycle = 'cycle'
-    zero = 'zero'
+    limit = 'limit'
 
 
 @dataclass
@@ -104,6 +105,17 @@ class Env(gym.Env[ObsType, ActType]):
         food_ind = dict(channel='env_food')
         self.medium.loc[food_ind] = self.dynamics.op_food_flow(self.medium.loc[food_ind])
 
+    def _agent_move_handle_boundary(self, coords_grid: da.DataArray) -> da.DataArray:
+        bound = self.dynamics.boundary
+        if bound == BoundaryCondition.cycle:
+            return coords_grid % 1.  # also handles negative overflow
+        elif bound == BoundaryCondition.limit:
+            return coords_grid.clip(0., 1.)
+        else:
+            logging.warning(f'Unfamiliar boundary condition: {bound}! '
+                            f'Doing nothing with boundary...')
+            return coords_grid
+
     @property
     def _get_agent_indexer(self) -> Dict:
         ixs, iys = self._get_agent_mask.values.nonzero()
@@ -118,6 +130,8 @@ class Env(gym.Env[ObsType, ActType]):
         agent_coords = self.coordgrid
         # NB: that's an array of new coords indexed by old coords -- key step
         new_coords_grid = agent_coords + delta_coords  # full grid
+        # Handle boundary condition
+        new_coords_grid = self._agent_move_handle_boundary(new_coords_grid)
 
         # Key step: elaborate approximate pointwise coordinate indexing
         agent_inds = self._get_agent_indexer  # pointwise indexer
