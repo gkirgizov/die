@@ -34,7 +34,7 @@ class Agent(ABC):
         return masked_action
 
 
-class SimpleAgent(Agent):
+class ModelAgentSket(Agent):
     def __init__(self):
         # TODO: need joint channels info for the system:
         #  it must know about its own presence
@@ -48,6 +48,22 @@ class SimpleAgent(Agent):
         result_action = self.postprocess_action(agents, action)
 
         return result_action
+
+
+class SimpleKernelAgent(Agent):
+    def __init__(self, deposit: float = 0.1):
+        self._deposit = deposit
+
+    def forward(self, obs: ObsType) -> ActType:
+        agents, medium = obs
+
+        coordinate_grid = Env
+        action = self.model(obs)
+
+        result_action = self.postprocess_action(agents, action)
+
+        return result_action
+
 
 
 class ConstAgent(Agent):

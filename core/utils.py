@@ -1,4 +1,4 @@
-from typing import Optional, Union, List, Tuple, TypeVar
+from typing import Optional, Union, List, Tuple, TypeVar, Sequence
 
 import numpy as np
 import xarray as da
@@ -22,3 +22,10 @@ def plot_medium(medium: MediumType, agents: AgtType, figsize=None):
                          cmap=cmap,
                          )
     return artist
+
+
+def get_meshgrid(field_size: Sequence[int]) -> np.ndarray:
+    # NB: dim order is reversed in xarray
+    xcs = [np.linspace(0., 1., num=size) for size in reversed(field_size)]
+    coord_grid = np.stack(np.meshgrid(*xcs))
+    return coord_grid

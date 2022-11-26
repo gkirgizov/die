@@ -14,7 +14,7 @@ import gymnasium as gym
 from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType, FoodOperator, \
     Array1C
 from core.data_init import DataInitializer
-from core.utils import plot_medium
+from core import utils
 
 RenderFrame = TypeVar('RenderFrame')
 
@@ -48,10 +48,10 @@ class Env(gym.Env[ObsType, ActType]):
     # TODO: maybe use Dataset with aligned `agents` and `medium` DataArrays
     #  with channels: x, y, food ??
     def __init__(self, field_size: Tuple[int, int]):
-        self.coordgrid = self._get_meshgrid(field_size)
+        self.coordgrid = utils.get_meshgrid(field_size)
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
-            .with_food_perlin(threshold=0.1) \
+            .with_food_perlin(threshold=1.0) \
             .build(name='medium')
 
         self.agents = DataInitializer(field_size, DataChannels.agents) \
@@ -117,7 +117,7 @@ class Env(gym.Env[ObsType, ActType]):
 
     def plot(self, figsize=None):
         # TODO: consult aspect ratio
-        plot_medium(self.medium, self.agents, figsize)
+        utils.plot_medium(self.medium, self.agents, figsize)
 
     def _medium_diffuse_decay(self):
         """Applies per-channel diffusion, channel-specific."""
@@ -254,13 +254,6 @@ class Env(gym.Env[ObsType, ActType]):
     @property
     def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
         return self._get_agent_mask.values.nonzero()
-
-    @staticmethod
-    def _get_meshgrid(field_size: Sequence[int]) -> np.ndarray:
-        # NB: dim order is reversed in xarray
-        xcs = [np.linspace(0., 1., num=size) for size in reversed(field_size)]
-        coord_grid = np.stack(np.meshgrid(*xcs))
-        return coord_grid
 
 
 if __name__ == '__main__':
