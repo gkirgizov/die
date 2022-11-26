@@ -7,7 +7,7 @@ from core.env import Env
 
 def try_agent_action(agent: Agent,
                      field_size=(256, 256),
-                     iters=200,
+                     iters=1000,
                      show_each=-1,
                      ):
     env = Env(field_size)
@@ -27,8 +27,8 @@ def try_agent_action(agent: Agent,
 
 
 def try_const_agent(**kwargs):
-    agent = ConstAgent(delta_xy=(0.001, 0.0025), deposit=0.1)
-    try_agent_action(agent, show_each=10, **kwargs)
+    agent = ConstAgent(delta_xy=(-0.005, -0.0025), deposit=0.1)
+    try_agent_action(agent, show_each=25, **kwargs)
 
 
 def try_random_agent(**kwargs):
@@ -37,5 +37,5 @@ def try_random_agent(**kwargs):
 
 
 if __name__ == '__main__':
-    try_const_agent()
-    # try_random_agent(field_size=(512, 512))
+    try_const_agent(field_size=(64, 64))
+    try_random_agent(field_size=(64, 64))

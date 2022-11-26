@@ -5,27 +5,34 @@ Plan
 - [x] test data init: plot channels
 - [x] make buffered update more efficient
 
-core
+Necessary core
 - [x] agent move async
 - [x] fix MockConstAgent
 - [x] test agent moving
 
 - [ ] some boundary conditions
 - [ ] get some avg stats (like a reward)
-- [ ] test agent lifecycle
-- [ ] test medium diffusion
-- [ ] test medium food dynamics
+- [ ] agent lifecycle
+- [ ] medium diffusion
+- [ ] medium food dynamics -- const | random add
 - [ ] agent action rescaling & saturation -- on which side? Env OR Agent?
       well, must be Env to make hacks "unaccessible" in principle
 - [ ] ...
 - [ ] test agent feeding & life cycle
 - [ ] test deposit with communication
 
-plotting
-- [ ] plotting NB: all tests are isolated visual cases, really
-      maybe with some statistical tests *over the image*
+Important core enhancements:
+- [ ] always update position with continous data channels in `agents` array
+      i.e. in coordinates store only approximations; but don't lose info on precision.
+
+Aux: plotting
+- plotting NB: all tests are isolated visual cases, really
+  maybe with some statistical tests *over the image*
 - [ ] aspect ratio
 - [ ] subplot with agent stats
 - [ ] advanced dynamic vis (see https://docs.xarray.dev/en/stable/user-guide/plotting.html)
+
+Well packaged
+- [ ] make tests out of visual examples
 
 """
