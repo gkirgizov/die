@@ -13,29 +13,6 @@ from core.utils import plot_medium
 
 RenderFrame = TypeVar('RenderFrame')
 
-"""
-Plan
-- [x] some basic data init ENVs per channels for tests YET minimal
-- [x] test data init: plot channels
-- [ ] plotting NB: all tests are isolated visual cases, really
-      maybe with some statistical tests *over the image*
-- [ ] make buffered update more efficient
-
-- [x] agent move async
-- [x] MockConstAgent
-- [ ] test agent moving
-
-- [ ] agent lifecycle
-- [ ] medium boundary conditions
-- [ ] ...
-- [ ] test agent feeding & life cycle
-- [ ] test medium diffusion
-- [ ] test deposit with communication
-
-- [ ] advanced dynamic vis (see https://docs.xarray.dev/en/stable/user-guide/plotting.html)
-
-"""
-
 
 @dataclass
 class Dynamics:
