@@ -198,10 +198,11 @@ class Env(gym.Env[ObsType, ActType]):
             self.buffer_agents.loc[nearest_cxy] = self.agents[ixy]  # move agent data to new position
         self._rotate_agent_buffer()
 
-    def _agent_act_on_medium(self, action: ActType):
+    def _agent_act_on_medium(self, action: ActType) -> Array1C:
         """Act on medium & consume required internal resource."""
         amount1 = action.sel(channel='deposit1')
         self.medium.loc[dict(channel='chem1')] += amount1
+        return amount1
 
     def _agent_consume_stock(self, action: ActType) -> Array1C:
         consumed = self.dynamics.op_action_cost(action)
@@ -211,13 +212,12 @@ class Env(gym.Env[ObsType, ActType]):
     def _agent_feed(self) -> Array1C:
         """Gains food from environment"""
         env_stock = self.medium.sel(channel='env_food')
-        # TODO: what's best gain?
         gained = self.dynamics.rate_feed * env_stock
-        # TODO: maybe coord-aligned summation will do that for me?
         self.agents.loc[dict(channel='agent_food')] += gained
         self.medium.loc[dict(channel='env_food')] -= gained
         return gained
 
+    # TODO: lifecycle
     def _agent_lifecycle(self):
         """Dies if consumed all internal stock,
         grows if has excess stock & favorable conditions."""
@@ -229,16 +229,18 @@ class Env(gym.Env[ObsType, ActType]):
 
     @property
     def _get_sense_mask(self) -> MaskType:
-        pass
-
-    @property
-    def _get_agents_medium(self) -> MediumType:
-        return self.medium.where(self._get_agent_mask)
+        """Get sense mask (neighbourhood of agents)
+        by diffusing agent points and rounding up."""
+        agents = self.agents.sel(channel='agents')
+        # sigma=0.4 round=3 for square neighbourhood=1
+        # sigma=0.4 round=2 for star neighbourhood=1
+        sense_mask = np.ceil(filters.gaussian(agents, sigma=0.4).round(3))
+        return sense_mask
 
     @property
     def _get_sensed_medium(self) -> MediumType:
         """Apply agent neighbourhood mask to the medium to get "what agents see"."""
-        visible_medium = self.medium.where(self._get_sense_mask)
+        visible_medium = self.medium.where(self._get_sense_mask, other=0.)
         return visible_medium
 
     @property
@@ -255,13 +257,6 @@ class Env(gym.Env[ObsType, ActType]):
         xcs = [np.linspace(0., 1., num=size) for size in reversed(field_size)]
         coord_grid = np.stack(np.meshgrid(*xcs))
         return coord_grid
-
-    def _meshstep(self) -> Tuple[float, float]:
-        xc = self.medium.coords['x'].values
-        yc = self.medium.coords['y'].values
-        dx = abs(xc[1] - xc[0])
-        dy = abs(yc[1] - yc[0])
-        return dx, dy
 
 
 if __name__ == '__main__':
