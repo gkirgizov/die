@@ -11,7 +11,8 @@ from skimage import filters
 import xarray as da
 import gymnasium as gym
 
-from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType, FoodOperator
+from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType, FoodOperator, \
+    Array1C
 from core.data_init import DataInitializer
 from core.utils import plot_medium
 
@@ -78,9 +79,9 @@ class Env(gym.Env[ObsType, ActType]):
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         """Each substep here leaves the world state valid and ready for the next substep."""
 
-        self._agent_feed()
+        food_got = self._agent_feed()
         self._agent_act_on_medium(action)
-        self._agent_consume_stock(action)
+        food_spent = self._agent_consume_stock(action)
         self._agent_lifecycle()
 
         self._medium_resource_dynamics()
@@ -90,10 +91,23 @@ class Env(gym.Env[ObsType, ActType]):
         # self._agent_move_async(action)
         self._agent_move(action)
 
-        # TODO: total reward? ending conditions? etc.
-        reward = 0.
+        num_agents = int(self._get_agent_mask.sum())
+        total_fed = float(food_got.sum())
+        total_spent = float(food_spent.sum())
+        total_gain = max(0., total_fed - total_spent)
+        mean_gain = total_gain / num_agents if num_agents > 0 else 0.
+        info = {
+            'num_agents': num_agents,
+            'total_fed': total_fed,
+            'total_spent': total_spent,
+            'total_reward': total_gain,
+            'mean_reward': mean_gain,
+        }
+        reward = total_gain
+        terminated = num_agents == 0
+        truncated = False
 
-        return self._get_current_obs, reward, False, False, {}
+        return self._get_current_obs, reward, terminated, truncated, info
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
         pass
@@ -189,11 +203,12 @@ class Env(gym.Env[ObsType, ActType]):
         amount1 = action.sel(channel='deposit1')
         self.medium.loc[dict(channel='chem1')] += amount1
 
-    def _agent_consume_stock(self, action: ActType):
+    def _agent_consume_stock(self, action: ActType) -> Array1C:
         consumed = self.dynamics.op_action_cost(action)
         self.agents.loc[dict(channel='agent_food')] -= consumed
+        return consumed
 
-    def _agent_feed(self):
+    def _agent_feed(self) -> Array1C:
         """Gains food from environment"""
         env_stock = self.medium.sel(channel='env_food')
         # TODO: what's best gain?
@@ -201,6 +216,7 @@ class Env(gym.Env[ObsType, ActType]):
         # TODO: maybe coord-aligned summation will do that for me?
         self.agents.loc[dict(channel='agent_food')] += gained
         self.medium.loc[dict(channel='env_food')] -= gained
+        return gained
 
     def _agent_lifecycle(self):
         """Dies if consumed all internal stock,
