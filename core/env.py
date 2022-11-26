@@ -34,6 +34,9 @@ class Dynamics:
     diffuse_mode: str = 'wrap'
     diffuse_sigma: float = 0.5
 
+    # test options?
+    food_infinite: bool = True
+
     @staticmethod
     def default_cost(action: ActType):
         dist = np.linalg.norm(action.sel(channel=['dx', 'dy']), axis=0)
@@ -214,7 +217,8 @@ class Env(gym.Env[ObsType, ActType]):
         env_stock = self.medium.sel(channel='env_food')
         gained = self.dynamics.rate_feed * env_stock
         self.agents.loc[dict(channel='agent_food')] += gained
-        self.medium.loc[dict(channel='env_food')] -= gained
+        if not self.dynamics.food_infinite:
+            self.medium.loc[dict(channel='env_food')] -= gained
         return gained
 
     def _agent_lifecycle(self):
