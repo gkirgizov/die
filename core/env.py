@@ -217,11 +217,11 @@ class Env(gym.Env[ObsType, ActType]):
         self.medium.loc[dict(channel='env_food')] -= gained
         return gained
 
-    # TODO: lifecycle
     def _agent_lifecycle(self):
         """Dies if consumed all internal stock,
         grows if has excess stock & favorable conditions."""
-        pass
+        have_food = self.agents.sel(channel='agent_food') > 1e-4
+        self.agents = self.agents.where(have_food, 0)
 
     @property
     def _get_agent_mask(self) -> MaskType:
