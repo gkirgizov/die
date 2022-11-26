@@ -3,22 +3,23 @@
 Plan
 - [x] some basic data init ENVs per channels for tests YET minimal
 - [x] test data init: plot channels
-- [x] make buffered update more efficient
 
 Necessary core
 - [x] agent move async
 - [x] fix MockConstAgent
 - [x] test agent moving
+- [x] make buffered update more efficient
+- [ ] agent moving separate coords separately!
 
-- [ ] some boundary conditions
+- [x] some boundary conditions
 - [ ] get some avg stats (like a reward)
 - [ ] agent lifecycle
-- [ ] medium diffusion
+- [x] medium diffusion & decay
 - [ ] medium food dynamics -- const | random add
 - [ ] agent action rescaling & saturation -- on which side? Env OR Agent?
       well, must be Env to make hacks "unaccessible" in principle
 - [ ] ...
-- [ ] test agent feeding & life cycle
+- [ ] test agent feeding & life wrap
 - [ ] test deposit with communication
 
 Important core enhancements:
