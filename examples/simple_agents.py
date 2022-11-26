@@ -27,8 +27,8 @@ def try_agent_action(agent: Agent,
 
 
 def try_const_agent(**kwargs):
-    agent = ConstAgent(delta_xy=(0.05, 0.025), deposit=0.01)
-    try_agent_action(agent, show_each=2, **kwargs)
+    agent = ConstAgent(delta_xy=(0.001, 0.0025), deposit=0.1)
+    try_agent_action(agent, show_each=10, **kwargs)
 
 
 def try_random_agent(**kwargs):
@@ -37,6 +37,5 @@ def try_random_agent(**kwargs):
 
 
 if __name__ == '__main__':
-    # try_const_agent()
-    # try_random_agent(field_size=(10, 8))
-    try_random_agent(field_size=(1024, 512))
+    try_const_agent()
+    # try_random_agent(field_size=(512, 512))

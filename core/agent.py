@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from typing import Optional, Union, List, Tuple, TypeVar, Callable
 
 import numpy as np
@@ -48,15 +49,20 @@ class SimpleAgent(Agent):
 
         return result_action
 
+
 class ConstAgent(Agent):
     def __init__(self, delta_xy: Tuple[float, float], deposit: float = 0.):
-        self._data = np.array([delta_xy[0], delta_xy[1], deposit])
+        self._data = {'dx': delta_xy[0],
+                      'dy': delta_xy[1],
+                      'deposit1': deposit}
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
 
         # at each agent location write our const vector
-        action = DataInitializer.init_action_for(agents, init_data=self._data)
+        action = DataInitializer.init_action_for(agents)
+        for chan in action.coords['channel'].values:
+            action.loc[dict(channel=chan)] = self._data[chan]
 
         return self.postprocess_action(agents, action)
 
