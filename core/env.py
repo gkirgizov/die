@@ -82,6 +82,9 @@ class Env(gym.Env[ObsType, ActType]):
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         """Each substep here leaves the world state valid and ready for the next substep."""
 
+        # NB: only agents that are alive (after lifecycle step) will move
+        # self._agent_move_async(action)
+        self._agent_move(action)
         food_got = self._agent_feed()
         self._agent_act_on_medium(action)
         food_spent = self._agent_consume_stock(action)
@@ -89,10 +92,6 @@ class Env(gym.Env[ObsType, ActType]):
 
         self._medium_resource_dynamics()
         self._medium_diffuse_decay()
-
-        # NB: only agents that are alive (after lifecycle step) will move
-        # self._agent_move_async(action)
-        self._agent_move(action)
 
         num_agents = int(self._get_agent_mask.sum())
         total_fed = float(food_got.sum())

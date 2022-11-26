@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from core.agent import ConstAgent, Agent, RandomAgent
+from core.agent import ConstAgent, Agent, RandomAgent, GradientAgent
 from core.env import Env
 
 
@@ -37,6 +37,12 @@ def try_random_agent(**kwargs):
     try_agent_action(agent, show_each=20, **kwargs)
 
 
+def try_gradient_agent(**kwargs):
+    agent = GradientAgent(scale=0.1, deposit=0.1, kind='gaussian_noise')
+    try_agent_action(agent, show_each=5, **kwargs)
+
+
 if __name__ == '__main__':
     # try_const_agent(field_size=(12, 12))
-    try_random_agent(field_size=(128, 128))
+    try_random_agent(field_size=(64, 64))
+

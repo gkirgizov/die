@@ -6,6 +6,7 @@ import numpy as np
 import xarray as da
 import gymnasium as gym
 
+from core import utils
 from core.base_types import ActType, ObsType, MaskType, AgtType, MediumType
 from core.data_init import DataInitializer
 
@@ -15,18 +16,23 @@ class Agent(ABC):
     def forward(self, obs: ObsType) -> ActType:
         pass
 
+    # @lru_cache(maxsize=1)
+    # def coordgrid(self, field_size):
+    #     return utils.get_meshgrid(field_size)
+
     @staticmethod
     def postprocess_action(agents: AgtType, action: ActType) -> ActType:
         masked = Agent._masked_alive(agents, action)
         rescaled = Agent._rescale_outputs(masked)
         return rescaled
 
-    # TODO: rescaling
+    # TODO: rescaling: seems unnecessary because of [0, 1] bounds?
     @staticmethod
     def _rescale_outputs(action: ActType) -> ActType:
         """Scale outputs to their natural boundaries."""
         return action
 
+    # TODO: agent masking: seems unnecessary because of natural Env logic?
     @staticmethod
     def _masked_alive(agents: AgtType, action: ActType) -> ActType:
         agent_alive_mask = agents.sel(channel='agents') > 0
@@ -50,20 +56,41 @@ class ModelAgentSket(Agent):
         return result_action
 
 
-class SimpleKernelAgent(Agent):
-    def __init__(self, deposit: float = 0.1):
+class GradientAgent(Agent):
+    """
+    Research questions:
+    - Passive selection by dying? vs. Active chemical trail depending on amount of food seen.
+    """
+
+    kinds = ('const', 'gaussian_noise')
+
+    def __init__(self,
+                 scale: float = 0.1,
+                 deposit: float = 0.1,
+                 kind: Optional[str] = None,
+                 ):
+        self._rng = np.random.default_rng()
+        self._kind = kind or self.kinds[0]
         self._deposit = deposit
+        self._scale = scale
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
+        action = DataInitializer.init_action_for(agents)
 
-        coordinate_grid = Env
-        action = self.model(obs)
+        # Compute chemical gradient
+        chemical = medium.sel(channel='chem1')
+        grad_x, grad_y = np.gradient(chemical)
 
-        result_action = self.postprocess_action(agents, action)
+        action.loc[dict(channel='dx')] = grad_x * self._scale
+        action.loc[dict(channel='dy')] = grad_y * self._scale
+        # const chemical deposit
+        action.loc[dict(channel='deposit1')] = self._deposit
 
-        return result_action
+        if self._kind == 'gaussian_noise':
+            action *= self._rng.normal(loc=1., scale=0.4, size=action.shape)
 
+        return self.postprocess_action(agents, action)
 
 
 class ConstAgent(Agent):
