@@ -5,6 +5,9 @@ from numbers import Number
 from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable, Dict
 
 import numpy as np
+# from scipy.signal import fftconvolve as convolve
+import skimage
+from skimage import filters
 import xarray as da
 import gymnasium as gym
 
@@ -16,7 +19,7 @@ RenderFrame = TypeVar('RenderFrame')
 
 
 class BoundaryCondition(Enum):
-    cycle = 'cycle'
+    wrap = 'wrap'
     limit = 'limit'
 
 
@@ -25,7 +28,9 @@ class Dynamics:
     op_action_cost: CostOperator
     op_food_flow: FoodOperator = lambda x: x
     rate_feed: float = 0.1 # TODO: maybe do lambda taking into account input?
-    boundary: BoundaryCondition = BoundaryCondition.cycle
+    boundary: BoundaryCondition = BoundaryCondition.wrap
+    diffuse_mode: str = 'wrap'
+    diffuse_sigma: float = 0.5
 
     @staticmethod
     def default_cost(action: ActType):
@@ -98,7 +103,13 @@ class Env(gym.Env[ObsType, ActType]):
 
     def _medium_diffuse(self):
         """Applies per-channel diffusion, channel-specific."""
-        pass
+        chem_ind = dict(channel='chem1')
+        chem_medium = self.medium.loc[chem_ind]
+        diffused = filters.gaussian(chem_medium,
+                                    sigma=self.dynamics.diffuse_sigma,
+                                    mode=self.dynamics.diffuse_mode,
+                                    preserve_range=True,)
+        self.medium.loc[chem_ind] = diffused
 
     def _medium_resource_dynamics(self):
         """Defines agent-independent inflow & outflow of resource."""
@@ -107,7 +118,7 @@ class Env(gym.Env[ObsType, ActType]):
 
     def _agent_move_handle_boundary(self, coords_grid: da.DataArray) -> da.DataArray:
         bound = self.dynamics.boundary
-        if bound == BoundaryCondition.cycle:
+        if bound == BoundaryCondition.wrap:
             return coords_grid % 1.  # also handles negative overflow
         elif bound == BoundaryCondition.limit:
             return coords_grid.clip(0., 1.)

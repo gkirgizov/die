@@ -1,5 +1,6 @@
 numpy
 scipy
+scikit-image
 xarray
 xbatcher
 perlin_noise

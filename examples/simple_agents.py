@@ -19,6 +19,7 @@ def try_agent_action(agent: Agent,
         # env._agent_move_async(action)
         env._agent_move(action)
         env._agent_act_on_medium(action)
+        env._medium_diffuse()
 
         if show_each > 0 and i % show_each == 0:
             print(f'drawing progress at iteration {i}')
@@ -27,8 +28,8 @@ def try_agent_action(agent: Agent,
 
 
 def try_const_agent(**kwargs):
-    agent = ConstAgent(delta_xy=(-0.005, -0.0025), deposit=0.1)
-    try_agent_action(agent, show_each=25, **kwargs)
+    agent = ConstAgent(delta_xy=(-0.01, 0.005), deposit=0.1)
+    try_agent_action(agent, show_each=2, **kwargs)
 
 
 def try_random_agent(**kwargs):
@@ -37,5 +38,5 @@ def try_random_agent(**kwargs):
 
 
 if __name__ == '__main__':
-    try_const_agent(field_size=(64, 64))
-    try_random_agent(field_size=(64, 64))
+    # try_const_agent(field_size=(12, 12))
+    try_random_agent(field_size=(128, 128))
