@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from numbers import Number
 from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable, Dict
 
@@ -7,17 +8,23 @@ import xarray as da
 import gymnasium as gym
 from matplotlib import pyplot as plt
 
-from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType
+from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType, FoodOperator
 from core.data_init import DataInitializer
 from core.utils import plot_medium
 
 RenderFrame = TypeVar('RenderFrame')
 
+class BoundaryCondition(Enum):
+    cycle = 'cycle'
+    zero = 'zero'
+
 
 @dataclass
 class Dynamics:
     op_action_cost: CostOperator
-    rate_feed: float  # TODO: maybe do lambda taking into account input?
+    op_food_flow: FoodOperator = lambda x: x
+    rate_feed: float = 0.1 # TODO: maybe do lambda taking into account input?
+    boundary: BoundaryCondition = BoundaryCondition.cycle
 
     @staticmethod
     def default_cost(action: ActType):
@@ -94,11 +101,9 @@ class Env(gym.Env[ObsType, ActType]):
 
     def _medium_resource_dynamics(self):
         """Defines agent-independent inflow & outflow of resource."""
-        pass
+        food_ind = dict(channel='env_food')
+        self.medium.loc[food_ind] = self.dynamics.op_food_flow(self.medium.loc[food_ind])
 
-    @property
-    def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
-        return self._get_agent_mask.values.nonzero()
     @property
     def _get_agent_indexer(self) -> Dict:
         ixs, iys = self._get_agent_mask.values.nonzero()
@@ -196,6 +201,10 @@ class Env(gym.Env[ObsType, ActType]):
     @property
     def _get_current_obs(self) -> ObsType:
         return self.agents, self._get_sensed_medium
+
+    @property
+    def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
+        return self._get_agent_mask.values.nonzero()
 
     @staticmethod
     def _get_meshgrid(field_size: Sequence[int]) -> np.ndarray:

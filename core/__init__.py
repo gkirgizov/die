@@ -7,13 +7,14 @@ Plan
 
 core
 - [x] agent move async
-- [ ] fix MockConstAgent
+- [x] fix MockConstAgent
 - [x] test agent moving
 
 - [ ] some boundary conditions
 - [ ] get some avg stats (like a reward)
 - [ ] test agent lifecycle
 - [ ] test medium diffusion
+- [ ] test medium food dynamics
 - [ ] agent action rescaling & saturation -- on which side? Env OR Agent?
       well, must be Env to make hacks "unaccessible" in principle
 - [ ] ...

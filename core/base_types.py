@@ -16,6 +16,7 @@ MaskType = Array1C
 CostType = Array1C
 
 CostOperator = Callable[[ActType], CostType]
+FoodOperator = Callable[[MediumType], Array1C]
 
 Operator = Callable[[da.DataArray], da.DataArray]
 BiOperator = Callable[[da.DataArray], da.DataArray]
