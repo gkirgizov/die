@@ -27,7 +27,8 @@ class BoundaryCondition(Enum):
 class Dynamics:
     op_action_cost: CostOperator
     op_food_flow: FoodOperator = lambda x: x
-    rate_feed: float = 0.1 # TODO: maybe do lambda taking into account input?
+    rate_feed: float = 0.1  # TODO: maybe do lambda taking into account input?
+    rate_decay_chem: float = 0.025
     boundary: BoundaryCondition = BoundaryCondition.wrap
     diffuse_mode: str = 'wrap'
     diffuse_sigma: float = 0.5
@@ -83,7 +84,7 @@ class Env(gym.Env[ObsType, ActType]):
         self._agent_lifecycle()
 
         self._medium_resource_dynamics()
-        self._medium_diffuse()
+        self._medium_diffuse_decay()
 
         # NB: only agents that are alive (after lifecycle step) will move
         # self._agent_move_async(action)
@@ -101,7 +102,7 @@ class Env(gym.Env[ObsType, ActType]):
         # TODO: consult aspect ratio
         plot_medium(self.medium, self.agents, figsize)
 
-    def _medium_diffuse(self):
+    def _medium_diffuse_decay(self):
         """Applies per-channel diffusion, channel-specific."""
         chem_ind = dict(channel='chem1')
         chem_medium = self.medium.loc[chem_ind]
@@ -109,6 +110,7 @@ class Env(gym.Env[ObsType, ActType]):
                                     sigma=self.dynamics.diffuse_sigma,
                                     mode=self.dynamics.diffuse_mode,
                                     preserve_range=True,)
+        diffused *= (1. - self.dynamics.rate_decay_chem)
         self.medium.loc[chem_ind] = diffused
 
     def _medium_resource_dynamics(self):

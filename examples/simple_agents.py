@@ -19,7 +19,7 @@ def try_agent_action(agent: Agent,
         # env._agent_move_async(action)
         env._agent_move(action)
         env._agent_act_on_medium(action)
-        env._medium_diffuse()
+        env._medium_diffuse_decay()
 
         if show_each > 0 and i % show_each == 0:
             print(f'drawing progress at iteration {i}')
