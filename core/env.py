@@ -47,7 +47,9 @@ class Dynamics:
 class Env(gym.Env[ObsType, ActType]):
     # TODO: maybe use Dataset with aligned `agents` and `medium` DataArrays
     #  with channels: x, y, food ??
-    def __init__(self, field_size: Tuple[int, int]):
+    def __init__(self,
+                 field_size: Tuple[int, int],
+                 dynamics: Optional[Dynamics] = None):
         self.coordgrid = utils.get_meshgrid(field_size)
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
@@ -55,7 +57,7 @@ class Env(gym.Env[ObsType, ActType]):
             .build(name='medium')
 
         self.agents = DataInitializer(field_size, DataChannels.agents) \
-            .with_agents(ratio=0.01) \
+            .with_agents(ratio=0.05) \
             .build(name='agents')
 
         # self.actions = DataInitializer(field_size, DataChannels.actions) \
@@ -64,8 +66,9 @@ class Env(gym.Env[ObsType, ActType]):
         self.buffer_agents = self.agents.copy(deep=True)
         self.buffer_medium = self.medium.copy(deep=True)
 
-        self.dynamics = Dynamics(op_action_cost=Dynamics.default_cost,
-                                 rate_feed=0.1)
+        self.dynamics = dynamics or Dynamics(op_action_cost=Dynamics.default_cost,
+                                             rate_feed=0.1,
+                                             rate_decay_chem=0.001)
 
     def _rotate_agent_buffer(self, reset_data=0.):
         tmp = self.agents
@@ -114,9 +117,9 @@ class Env(gym.Env[ObsType, ActType]):
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
         pass
 
-    def plot(self, figsize=None):
-        # TODO: consult aspect ratio
-        utils.plot_medium(self.medium, self.agents, figsize)
+    def plot(self, size: float = 8):
+        return utils.plot_medium(self.medium, self.agents,
+                                 size=size, aspect=self._get_aspect_ratio)
 
     def _medium_diffuse_decay(self):
         """Applies per-channel diffusion, channel-specific."""
@@ -253,6 +256,15 @@ class Env(gym.Env[ObsType, ActType]):
     @property
     def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
         return self._get_agent_mask.values.nonzero()
+
+    @property
+    def _get_aspect_ratio(self) -> float:
+        xs = self.medium.coords['x']
+        ys = self.medium.coords['y']
+        width = max(xs) - min(xs)
+        height = max(ys) - min(ys)
+        aspect = width / height
+        return aspect
 
 
 if __name__ == '__main__':
