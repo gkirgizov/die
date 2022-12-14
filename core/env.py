@@ -148,35 +148,33 @@ class Env(gym.Env[ObsType, ActType]):
                             f'Doing nothing with boundary...')
             return coords_grid
 
-    @property
-    def _get_agent_indexer(self) -> Dict:
-        ixs, iys = self._get_agent_mask.values.nonzero()
-        # https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
-        pointwise_indexer = dict(x=da.DataArray(ixs),
-                                 y=da.DataArray(iys))
-        return pointwise_indexer
+    def _sel_by_agents(self, field: da.DataArray) -> da.DataArray:
+        # TODO: caching
+        agent_info = self.agents  # TODO: tmp
+        coord_chans = ['x', 'y']
+
+        # Pointwise approximate indexing:
+        # get mapping AGENT_IDX->ACTION as a sequence
+        # details: https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
+        cell_indexer = {coord_chan: agent_info.sel(channel=coord_chan)
+                        for coord_chan in coord_chans}
+        # cell_indexer = {coord_chan: coords
+        #                 for coord_chan, coords in zip(coord_chans, agent_info)}
+        field_selection = field.sel(**cell_indexer, method='nearest')
+        return field_selection
 
     def _agent_move(self, action: ActType):
-        # Compute new positions
-        delta_coords = action.sel(channel=['dx', 'dy'])
-        agent_coords = self.coordgrid
-        # NB: that's an array of new coords indexed by old coords -- key step
-        new_coords_grid = agent_coords + delta_coords  # full grid
-        # Handle boundary condition
-        new_coords_grid = self._agent_move_handle_boundary(new_coords_grid)
+        agent_info = self.agents  # TODO: tmp
+        coord_chans = ['x', 'y']
 
-        # Key step: elaborate approximate pointwise coordinate indexing
-        agent_inds = self._get_agent_indexer  # pointwise indexer
-        new_coords = new_coords_grid[agent_inds]
-        # TODO: here in principle can filter out already occupied cells
-        cell_indexer = dict(x=da.DataArray(new_coords[0]),
-                            y=da.DataArray(new_coords[1]))
-        new_cells = self.agents.sel(**cell_indexer, method='nearest')
+        agent_actions = self._sel_by_agents(action)
+        # Update positions, don't forget about boundary conditions
+        agent_coords = agent_info.sel(channel=coord_chans)
+        delta_coords = agent_actions.sel(channel=coord_chans)
+        agent_coords_new = self._agent_move_handle_boundary(agent_coords + delta_coords)
+        agent_info.loc[dict(channel=coord_chans)] = agent_coords_new
 
-        # Move agents with their channels
-        self.buffer_agents.loc[new_cells.coords] = self.agents[agent_inds]
-
-        self._rotate_agent_buffer()
+        # TODO: maybe deposit at this same step? other actions, no?
 
     def _iter_agents(self, shuffle: bool = True) -> Sequence[Tuple[int, int]]:
         xs, ys = self._get_agent_indices
