@@ -18,8 +18,8 @@ def try_agent_action(agent: Agent,
 
         # env._agent_move_async(action)
         env._agent_move(action)
-        env._agent_act_on_medium(action)
-        env._medium_diffuse_decay()
+        # env._agent_act_on_medium(action)
+        # env._medium_diffuse_decay()
 
         if show_each > 0 and i % show_each == 0:
             num_agents = int(env._get_agent_mask.sum())
@@ -31,7 +31,7 @@ def try_agent_action(agent: Agent,
 
 def try_const_agent(**kwargs):
     agent = ConstAgent(delta_xy=(-0.01, 0.005), deposit=0.1)
-    try_agent_action(agent, show_each=2, **kwargs)
+    try_agent_action(agent, show_each=20, **kwargs)
 
 
 def try_random_agent(**kwargs):
@@ -45,8 +45,9 @@ def try_gradient_agent(**kwargs):
 
 
 if __name__ == '__main__':
-    field_size = (256, 256)
-    # try_const_agent(field_size=field_size)
+    # field_size = (256, 256)
+    field_size = (16, 16)
+    try_const_agent(field_size=field_size)
     # try_random_agent(field_size=field_size)
-    try_gradient_agent(field_size=field_size)
+    # try_gradient_agent(field_size=field_size)
 

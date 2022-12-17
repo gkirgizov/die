@@ -35,7 +35,7 @@ class Agent(ABC):
     # TODO: agent masking: seems unnecessary because of natural Env logic?
     @staticmethod
     def _masked_alive(agents: AgtType, action: ActType) -> ActType:
-        agent_alive_mask = agents.sel(channel='agents') > 0
+        agent_alive_mask = agents.sel(channel='alive') > 0
         masked_action = action * agent_alive_mask
         return masked_action
 
@@ -76,7 +76,7 @@ class GradientAgent(Agent):
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
-        action = DataInitializer.init_action_for(agents)
+        action = DataInitializer.init_action_for(medium)
 
         # Compute chemical gradient
         chemical = medium.sel(channel='chem1')
@@ -90,7 +90,8 @@ class GradientAgent(Agent):
         if self._kind == 'gaussian_noise':
             action *= self._rng.normal(loc=1., scale=0.4, size=action.shape)
 
-        return self.postprocess_action(agents, action)
+        # return self.postprocess_action(agents, action)
+        return action
 
 
 class ConstAgent(Agent):
@@ -103,11 +104,12 @@ class ConstAgent(Agent):
         agents, medium = obs
 
         # at each agent location write our const vector
-        action = DataInitializer.init_action_for(agents)
+        action = DataInitializer.init_action_for(medium)
         for chan in action.coords['channel'].values:
             action.loc[dict(channel=chan)] = self._data[chan]
 
-        return self.postprocess_action(agents, action)
+        return action
+        # return self.postprocess_action(agents, action)
 
 
 class RandomAgent(Agent):
@@ -119,10 +121,11 @@ class RandomAgent(Agent):
         agents, medium = obs
 
         s = self._scale
-        action = DataInitializer.action_for(agents) \
+        action = DataInitializer.action_for(medium) \
             .with_noise('dx', -s, s) \
             .with_noise('dy', -s, s) \
             .with_noise('deposit1', 0., self._dep_scale) \
             .build()
 
-        return self.postprocess_action(agents, action)
+        return action
+        # return self.postprocess_action(agents, action)

@@ -1,6 +1,6 @@
 from numbers import Number
 from numbers import Number
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 from typing import Union, Sequence, Hashable
 
 import numpy as np
@@ -8,6 +8,7 @@ import xarray as da
 from perlin_noise import PerlinNoise
 
 from core.base_types import Channels, DataChannels, ObsType, ActType, MediumType, AgtType
+from core.utils import get_agents_by_medium
 
 
 class DataInitializer:
@@ -33,17 +34,42 @@ class DataInitializer:
         return medium
 
     @staticmethod
-    def init_action_for(agents: AgtType, init_data=0.) -> ActType:
-        return DataInitializer.init_field_array(field_size=agents.shape[1:],
+    def agents_from_medium(medium: MediumType) -> AgtType:
+        channels: Sequence[Hashable] = DataChannels.agents
+        name: str = 'agents'
+
+        agents_coords = get_agents_by_medium(medium)
+        num_agents = agents_coords.shape[-1]
+        chan_alive = np.ones(num_agents)
+        chan_food = DataInitializer.get_random(num_agents, 0.1, 0.2)
+
+        shape = (len(channels), num_agents)
+        init_data = np.vstack([agents_coords, chan_alive, chan_food])
+
+        agents = da.DataArray(
+            data=init_data,
+            dims=['channel', 'index'],
+            coords={'channel': list(channels)},
+            name=name,
+        )
+        return agents
+
+    @staticmethod
+    def init_action_for(medium: MediumType, init_data=0.) -> ActType:
+        return DataInitializer.init_field_array(field_size=medium.shape[1:],
                                                 channels=DataChannels.actions,
                                                 name='actions',
                                                 init_data=init_data)
 
     @staticmethod
-    def action_for(agents: AgtType) -> 'DataInitializer':
-        return DataInitializer(field_size=agents.shape[1:],
+    def action_for(medium: MediumType) -> 'DataInitializer':
+        return DataInitializer(field_size=medium.shape[1:],
                                channels=DataChannels.actions,
                                name='actions')
+
+    @staticmethod
+    def get_random(size, a=0., b=1.) -> np.ndarray:
+        return (b-a) * np.random.random_sample(size).round(3) + a
 
     def __init__(self,
                  field_size: Tuple[int, int],
@@ -58,7 +84,7 @@ class DataInitializer:
         return sampled * mask
 
     def _get_random(self, a=0., b=1.) -> np.ndarray:
-        return (b-a) * np.random.random_sample(self._size).round(3) + a
+        return self.get_random(self._size, a, b)
 
     def _get_perlin(self, octaves: int = 8) -> np.ndarray:
         noise = PerlinNoise(octaves=octaves)
@@ -90,7 +116,7 @@ class DataInitializer:
     def with_agents(self, ratio: float):
         agents = np.ceil(self._mask(self._get_random(), mask_above_threshold=ratio))
         self._channels['agents'] = agents
-        self._channels['agent_food'] = agents * self._get_random(0.1, 0.2)
+        # self._channels['agent_food'] = agents * self._get_random(0.1, 0.2)
         return self
 
     def with_food_perlin(self, threshold: float = 0.25):

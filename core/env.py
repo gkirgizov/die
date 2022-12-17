@@ -54,16 +54,11 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_food_perlin(threshold=1.0) \
+            .with_agents(ratio=0.05) \
             .build(name='medium')
 
-        self.agents = DataInitializer(field_size, DataChannels.agents) \
-            .with_agents(ratio=0.05) \
-            .build(name='agents')
+        self.agents = DataInitializer.agents_from_medium(self.medium)
 
-        # self.actions = DataInitializer(field_size, DataChannels.actions) \
-        #     .build(name='actions')
-
-        self.buffer_agents = self.agents.copy(deep=True)
         self.buffer_medium = self.medium.copy(deep=True)
 
         self.dynamics = dynamics or Dynamics(op_action_cost=Dynamics.default_cost,
@@ -71,12 +66,6 @@ class Env(gym.Env[ObsType, ActType]):
                                              rate_decay_chem=0.001)
 
     def _rotate_agent_buffer(self, reset_data=0.):
-        tmp = self.agents
-        self.agents = self.buffer_agents
-        self.buffer_agents = tmp
-        self.buffer_agents[:] = reset_data
-
-    def _rotate_medium_buffer(self, reset_data=0.):
         tmp = self.medium
         self.medium = self.buffer_medium
         self.buffer_medium = tmp
@@ -137,42 +126,44 @@ class Env(gym.Env[ObsType, ActType]):
         food_ind = dict(channel='env_food')
         self.medium.loc[food_ind] = self.dynamics.op_food_flow(self.medium.loc[food_ind])
 
-    def _agent_move_handle_boundary(self, coords_grid: da.DataArray) -> da.DataArray:
+    def _agent_move_handle_boundary(self, coords_array: da.DataArray) -> da.DataArray:
         bound = self.dynamics.boundary
         if bound == BoundaryCondition.wrap:
-            return coords_grid % 1.  # also handles negative overflow
+            return coords_array % 1.  # also handles negative overflow
         elif bound == BoundaryCondition.limit:
-            return coords_grid.clip(0., 1.)
+            return coords_array.clip(0., 1.)
         else:
             logging.warning(f'Unfamiliar boundary condition: {bound}! '
                             f'Doing nothing with boundary...')
-            return coords_grid
+            return coords_array
 
     def _sel_by_agents(self, field: da.DataArray) -> da.DataArray:
-        # TODO: caching
-        agent_info = self.agents  # TODO: tmp
         coord_chans = ['x', 'y']
-
+        # TODO: caching
         # Pointwise approximate indexing:
-        # get mapping AGENT_IDX->ACTION as a sequence
-        # details: https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
-        cell_indexer = {coord_chan: agent_info.sel(channel=coord_chan)
-                        for coord_chan in coord_chans}
-        # cell_indexer = {coord_chan: coords
-        #                 for coord_chan, coords in zip(coord_chans, agent_info)}
+        #  get mapping AGENT_IDX->ACTION as a sequence
+        #  details: https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
+        cell_indexer = {coord_ch: self.agents.sel(channel=coord_ch)
+                        for coord_ch in coord_chans}
         field_selection = field.sel(**cell_indexer, method='nearest')
         return field_selection
 
     def _agent_move(self, action: ActType):
-        agent_info = self.agents  # TODO: tmp
         coord_chans = ['x', 'y']
+        delta_chans = ['dx', 'dy']
 
+        # Map action *grid* to *1d* agent-like array
         agent_actions = self._sel_by_agents(action)
-        # Update positions, don't forget about boundary conditions
-        agent_coords = agent_info.sel(channel=coord_chans)
-        delta_coords = agent_actions.sel(channel=coord_chans)
+        # Compute new positions, don't forget about boundary conditions
+        agent_coords = self.agents.sel(channel=coord_chans).to_numpy()
+        delta_coords = agent_actions.sel(channel=delta_chans).to_numpy()
         agent_coords_new = self._agent_move_handle_boundary(agent_coords + delta_coords)
-        agent_info.loc[dict(channel=coord_chans)] = agent_coords_new
+        # Update agent coordinates
+        self.agents.loc[dict(channel=coord_chans)] = agent_coords_new
+
+        # Simpler logic relying on automatic coordinate alignment
+        # agent_coords_new = self._agent_move_handle_boundary(self.agents + agent_actions)
+        # self.agents.loc[dict(channel=coord_chans)] = agent_coords_new
 
         # TODO: maybe deposit at this same step? other actions, no?
 
@@ -184,6 +175,7 @@ class Env(gym.Env[ObsType, ActType]):
         return agent_inds
 
     def _agent_move_async(self, action: ActType):
+        agents = self.medium.sel(channel='agents')
         for ix, iy in self._iter_agents(shuffle=True):
             ixy = dict(x=ix, y=iy)
             # Get all medium & movement data
@@ -194,11 +186,11 @@ class Env(gym.Env[ObsType, ActType]):
             x = agent_action.coords['x'].values
             y = agent_action.coords['y'].values
             # Compute new pos
-            nearest_cxy = self.agents.sel(x=x + dx, y=y + dy, method='nearest').coords
+            nearest_cxy = agents.sel(x=x + dx, y=y + dy, method='nearest').coords
 
             # Update agents
-            # TODO: all these coords can be got in vectorized fashion? just write in buffer?
-            self.buffer_agents.loc[nearest_cxy] = self.agents[ixy]  # move agent data to new position
+            # TODO: not working now due to bad array overwrite
+            self.buffer_medium.loc[nearest_cxy] = agents[ixy]  # move agent data to new position
         self._rotate_agent_buffer()
 
     def _agent_act_on_medium(self, action: ActType) -> Array1C:
@@ -229,13 +221,17 @@ class Env(gym.Env[ObsType, ActType]):
 
     @property
     def _get_agent_mask(self) -> MaskType:
-        return self.agents.sel(channel='agents') > 0
+        return self.medium.sel(channel='agents') > 0
+
+    @property
+    def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
+        return self._get_agent_mask.values.nonzero()
 
     @property
     def _get_sense_mask(self) -> MaskType:
         """Get sense mask (neighbourhood of agents)
         by diffusing agent points and rounding up."""
-        agents = self.agents.sel(channel='agents')
+        agents = self.medium.sel(channel='agents')
         # sigma=0.4 round=3 for square neighbourhood=1
         # sigma=0.4 round=2 for star neighbourhood=1
         sense_mask = np.ceil(filters.gaussian(agents, sigma=0.4).round(3))
@@ -250,10 +246,6 @@ class Env(gym.Env[ObsType, ActType]):
     @property
     def _get_current_obs(self) -> ObsType:
         return self.agents, self._get_sensed_medium
-
-    @property
-    def _get_agent_indices(self) -> Tuple[np.ndarray, np.ndarray]:
-        return self._get_agent_mask.values.nonzero()
 
     @property
     def _get_aspect_ratio(self) -> float:

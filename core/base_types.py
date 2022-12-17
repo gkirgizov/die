@@ -6,7 +6,7 @@ import xarray as da
 # ActType = TypeVar('ActType')
 # ObsType = TypeVar('ObsType')
 ActType = da.DataArray
-AgtType = da.DataArray
+AgtType = da.DataArray  # 1-channel array
 MediumType = da.DataArray
 ObsType = Tuple[AgtType, MediumType]
 
@@ -25,7 +25,8 @@ Channels = Sequence[Hashable]
 
 
 class DataChannels:
-    medium: Channels = ('env_food', 'chem1')
-    agents: Channels = ('agents', 'agent_food')
+    medium: Channels = ('agents', 'env_food', 'chem1')
+    agents: Channels = ('x', 'y', 'alive', 'agent_food')
+    # agents: Channels = ('agents', 'agent_food')
     # action: Channels = ('dist', 'turn', 'deposit1')
     actions: Channels = ('dx', 'dy', 'deposit1')
