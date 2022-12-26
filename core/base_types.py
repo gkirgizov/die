@@ -30,3 +30,8 @@ class DataChannels:
     # agents: Channels = ('agents', 'agent_food')
     # action: Channels = ('dist', 'turn', 'deposit1')
     actions: Channels = ('dx', 'dy', 'deposit1')
+
+    # TODO: align
+    #  dx|x
+    #  agents | alive
+    #  env_food | agent_food

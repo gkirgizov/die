@@ -51,6 +51,7 @@ class Env(gym.Env[ObsType, ActType]):
                  field_size: Tuple[int, int],
                  dynamics: Optional[Dynamics] = None):
         self.coordgrid = utils.get_meshgrid(field_size)
+        # self.coordsteps = np.abs(self.coordgrid[:, 1] - self.coordgrid[:, 0])
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_food_perlin(threshold=1.0) \
@@ -77,6 +78,8 @@ class Env(gym.Env[ObsType, ActType]):
         # NB: only agents that are alive (after lifecycle step) will move
         # self._agent_move_async(action)
         self._agent_move(action)
+        self._agents_to_medium()
+
         food_got = self._agent_feed()
         self._agent_act_on_medium(action)
         food_spent = self._agent_consume_stock(action)
@@ -125,6 +128,15 @@ class Env(gym.Env[ObsType, ActType]):
         """Defines agent-independent inflow & outflow of resource."""
         food_ind = dict(channel='env_food')
         self.medium.loc[food_ind] = self.dynamics.op_food_flow(self.medium.loc[food_ind])
+
+    def _agents_to_medium(self):
+        ch_agents = dict(channel='agents')
+        agent_cells = self._sel_by_agents(self.medium)
+        agent_coords = {ch: agent_cells.coords[ch] for ch in ['x', 'y']}
+        agent_coords.update(ch_agents)
+
+        self.medium.loc[ch_agents] = 0
+        self.medium.loc[agent_coords] = 1  # TODO: make not binary but 'alive' continuous
 
     def _agent_move_handle_boundary(self, coords_array: da.DataArray) -> da.DataArray:
         bound = self.dynamics.boundary

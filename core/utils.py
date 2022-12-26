@@ -27,6 +27,7 @@ def get_meshgrid(field_size: Sequence[int]) -> np.ndarray:
     # NB: dim order is reversed in xarray
     xcs = [np.linspace(0., 1., num=size) for size in reversed(field_size)]
     coord_grid = np.stack(np.meshgrid(*xcs))
+    # steps = [abs(coords[1] - coords[0]) for coords in xcs]
     return coord_grid
 
 

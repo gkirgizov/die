@@ -20,10 +20,10 @@ Necessary core
     - [x] do I need normal coord storing in channels for this? to be simpler? seems like yes.
     - [x] make & test DataInitializer for new agents, subst usages of its methods
         - [x] agents from medium MAPPING
-        - [ ] get_current_obs
-        - [ ] modify simple agents
-        -[ ] check postprocess action in Agent
-        - [ ] test mapping & DataInit
+        - [x] get_current_obs
+        - [x] modify simple agents
+        - [x] check postprocess action in Agent
+        - [x] test mapping & DataInit
     - [ ] return agents map to field? make a separate method for mapping them
         - [ ] think if needed doing this in-the-loop ?
         - [ ] agents lifecycle & other methods
@@ -61,6 +61,7 @@ Necessary core
 Important core enhancements:
 - [ ] always update position with continous data channels in `agents` array
       i.e. in coordinates store only approximations; but don't lose info on precision.
+- [ ] **implement separate 2-way mapper for such indexers**
 
 Aux: plotting
 - plotting NB: all tests are isolated visual cases, really
@@ -75,5 +76,7 @@ Well packaged
 - [ ] implement gym.Env API fully
 tests
 - [ ] make test for double-way mapping agents --> medium and back
+
+
 
 """
