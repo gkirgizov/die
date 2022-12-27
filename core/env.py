@@ -214,7 +214,7 @@ class Env(gym.Env[ObsType, ActType]):
         """Act on medium & consume required internal resource."""
         # Deposit chemical
         amount1 = action.sel(channel='deposit1')
-        self.medium.loc[dict(channel='chem1')] += amount1
+        self.medium.loc[dict(channel='chem1')] += amount1 * self._get_agent_mask
         return amount1
 
     # TODO: unify with agent_feed
