@@ -78,7 +78,7 @@ class Env(gym.Env[ObsType, ActType]):
         # NB: only agents that are alive (after lifecycle step) will move
         # self._agent_move_async(action)
         self._agent_move(action)
-        self._agents_to_medium()
+        self._agents_to_medium()  # updates position of agents in medium array
 
         food_got = self._agent_feed()
         self._agent_act_on_medium(action)
@@ -129,15 +129,6 @@ class Env(gym.Env[ObsType, ActType]):
         food_ind = dict(channel='env_food')
         self.medium.loc[food_ind] = self.dynamics.op_food_flow(self.medium.loc[food_ind])
 
-    def _agents_to_medium(self):
-        ch_agents = dict(channel='agents')
-        agent_cells = self._sel_by_agents(self.medium)
-        agent_coords = {ch: agent_cells.coords[ch] for ch in ['x', 'y']}
-        agent_coords.update(ch_agents)
-
-        self.medium.loc[ch_agents] = 0
-        self.medium.loc[agent_coords] = 1  # TODO: make not binary but 'alive' continuous
-
     def _agent_move_handle_boundary(self, coords_array: da.DataArray) -> da.DataArray:
         bound = self.dynamics.boundary
         if bound == BoundaryCondition.wrap:
@@ -149,16 +140,23 @@ class Env(gym.Env[ObsType, ActType]):
                             f'Doing nothing with boundary...')
             return coords_array
 
-    def _sel_by_agents(self, field: da.DataArray) -> da.DataArray:
+    def _sel_by_agents(self, field: da.DataArray, only_alive=False) -> da.DataArray:
         coord_chans = ['x', 'y']
-        # TODO: caching
         # Pointwise approximate indexing:
         #  get mapping AGENT_IDX->ACTION as a sequence
         #  details: https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
-        cell_indexer = {coord_ch: self.agents.sel(channel=coord_ch)
+        agents = self._get_alive_agents() if only_alive else self.agents
+        cell_indexer = {coord_ch: agents.sel(channel=coord_ch)
                         for coord_ch in coord_chans}
         field_selection = field.sel(**cell_indexer, method='nearest')
         return field_selection
+
+    def _medium_agent_coords(self) -> Dict:
+        # coord_chans = self.medium.coords[1:]
+        coord_chans = ['x', 'y']
+        agent_cells = self._sel_by_agents(self.medium)
+        agent_coords = {ch: agent_cells.coords[ch] for ch in coord_chans}
+        return agent_coords
 
     def _agent_move(self, action: ActType):
         coord_chans = ['x', 'y']
@@ -205,12 +203,21 @@ class Env(gym.Env[ObsType, ActType]):
             self.buffer_medium.loc[nearest_cxy] = agents[ixy]  # move agent data to new position
         self._rotate_agent_buffer()
 
+    def _agents_to_medium(self):
+        agent_coords = self._medium_agent_coords()
+        # Set agent locations
+        # TODO: make not binary but 'alive' continuous
+        self.medium.loc[dict(channel='agents')] = 0
+        self.medium.loc[dict(**agent_coords, channel='agents')] = 1
+
     def _agent_act_on_medium(self, action: ActType) -> Array1C:
         """Act on medium & consume required internal resource."""
+        # Deposit chemical
         amount1 = action.sel(channel='deposit1')
         self.medium.loc[dict(channel='chem1')] += amount1
         return amount1
 
+    # TODO: unify with agent_feed
     def _agent_consume_stock(self, action: ActType) -> Array1C:
         consumed = self.dynamics.op_action_cost(action)
         self.agents.loc[dict(channel='agent_food')] -= consumed
@@ -230,6 +237,12 @@ class Env(gym.Env[ObsType, ActType]):
         grows if has excess stock & favorable conditions."""
         have_food = self.agents.sel(channel='agent_food') > 1e-4
         self.agents = self.agents.where(have_food, 0)
+
+    def _get_alive_agents(self, view=True) -> AgtType:
+        """Returns only agents which are alive, dropping dead agents from array."""
+        agent_inds = self.agents.sel(channel='alive').values.nonzero()[0]
+        alive_agents = self.agents.isel(index=agent_inds) if view else self.agents[agent_inds]
+        return alive_agents
 
     @property
     def _get_agent_mask(self) -> MaskType:

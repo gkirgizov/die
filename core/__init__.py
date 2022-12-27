@@ -25,8 +25,10 @@ Necessary core
         - [x] check postprocess action in Agent
         - [x] test mapping & DataInit
     - [ ] return agents map to field? make a separate method for mapping them
+        - [x] consider alive agents only
         - [ ] think if needed doing this in-the-loop ?
-        - [ ] agents lifecycle & other methods
+        - [x] agents lifecycle & deposit
+        - [ ] agents feed & consume
     - [x] sort out why agents are ...lost?...
     - [ ] add consideration of alive/not
     - [ ] rewrite other methods
