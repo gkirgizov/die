@@ -10,20 +10,18 @@ from core.agent import Agent
 from core.utils import plot_medium
 
 
-def get_test_fields(field_size):
+def get_test_fields(field_size, agents_ratio=0.2):
     medium = DataInitializer(field_size, DataChannels.medium) \
+        .with_agents(ratio=agents_ratio) \
         .with_food_perlin(threshold=0.5) \
         .with_chem(threshold=0.25) \
         .build()
-    agents = DataInitializer(field_size, DataChannels.agents) \
-        .with_agents(ratio=0.05) \
-        .build()
+    agents = DataInitializer.agents_from_medium(medium)
     action = DataInitializer(field_size, DataChannels.actions) \
         .with_noise('dx', 0, 3) \
         .with_noise('dy', 0, 2) \
         .with_noise('deposit1', 0, 1) \
         .build()
-
     return medium, agents, action
 
 

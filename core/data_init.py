@@ -34,20 +34,24 @@ class DataInitializer:
         return medium
 
     @staticmethod
-    def agents_from_medium(medium: MediumType) -> AgtType:
+    def agents_from_medium(medium: MediumType, max_agents=None, food_ratio=1.0) -> AgtType:
         channels: Sequence[Hashable] = DataChannels.agents
         name: str = 'agents'
 
         agents_coords = get_agents_by_medium(medium)
-        num_agents = agents_coords.shape[-1]
-        chan_alive = np.ones(num_agents)
-        chan_food = DataInitializer.get_random(num_agents, 0.1, 0.2)
-
-        shape = (len(channels), num_agents)
+        num_agents_alive = agents_coords.shape[-1]
+        chan_alive = np.ones(num_agents_alive)
+        chan_food = DataInitializer.get_random(num_agents_alive, 0.1, food_ratio)
         init_data = np.vstack([agents_coords, chan_alive, chan_food])
 
+        if not max_agents:
+            max_agents = medium.shape[-2] * medium.shape[-1]
+        shape = (len(channels), max_agents)
+        all_init_data = np.zeros(shape)
+        all_init_data[:, :num_agents_alive] = init_data
+
         agents = da.DataArray(
-            data=init_data,
+            data=all_init_data,
             dims=['channel', 'index'],
             coords={'channel': list(channels)},
             name=name,

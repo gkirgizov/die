@@ -19,6 +19,7 @@ def try_agent_action(agent: Agent,
         # env._agent_move_async(action)
         env._agent_move(action)
         env._agents_to_medium()
+        env._agent_feed(action)
         env._agent_act_on_medium(action)
         env._medium_diffuse_decay()
 
@@ -47,8 +48,8 @@ def try_gradient_agent(**kwargs):
 
 if __name__ == '__main__':
     # field_size = (256, 256)
-    field_size = (128, 128)
-    # field_size = (32, 32)
+    # field_size = (128, 128)
+    field_size = (32, 32)
     # try_const_agent(field_size=field_size, show_each=8)
     try_random_agent(field_size=field_size, show_each=20)
     # try_gradient_agent(field_size=field_size, show_each=20)
