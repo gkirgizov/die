@@ -88,7 +88,7 @@ class Env(gym.Env[ObsType, ActType]):
         self._medium_resource_dynamics()
         self._medium_diffuse_decay()
 
-        num_agents = int(self._get_agent_mask.sum())
+        num_agents = self._num_agents
         total_fed = float(food_got.sum())
         total_spent = float(food_spent.sum())
         total_gain = max(0., total_fed - total_spent)
@@ -243,6 +243,10 @@ class Env(gym.Env[ObsType, ActType]):
         agent_inds = self.agents.sel(channel='alive').values.nonzero()[0]
         alive_agents = self.agents.isel(index=agent_inds) if view else self.agents[agent_inds]
         return alive_agents
+
+    @property
+    def _num_agents(self) -> int:
+        return self._get_alive_agents().shape[1]
 
     @property
     def _get_agent_mask(self) -> MaskType:

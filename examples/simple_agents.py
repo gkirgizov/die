@@ -23,7 +23,7 @@ def try_agent_action(agent: Agent,
         env._medium_diffuse_decay()
 
         if show_each > 0 and i % show_each == 0:
-            num_agents = int(env._get_agent_mask.sum())
+            num_agents = env._num_agents
             print(f'drawing progress at iteration {i}: '
                   f'num_agents={num_agents}')
             env.plot()
@@ -50,6 +50,6 @@ if __name__ == '__main__':
     field_size = (128, 128)
     # field_size = (32, 32)
     # try_const_agent(field_size=field_size, show_each=8)
-    # try_random_agent(field_size=field_size, show_each=20)
-    try_gradient_agent(field_size=field_size, show_each=20)
+    try_random_agent(field_size=field_size, show_each=20)
+    # try_gradient_agent(field_size=field_size, show_each=20)
 
