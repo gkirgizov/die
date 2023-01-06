@@ -80,23 +80,18 @@ class Env(gym.Env[ObsType, ActType]):
         self._agent_move(action)
         self._agents_to_medium()  # updates position of agents in medium array
 
-        food_got = self._agent_feed()
+        energy_gain = self._agent_feed(action)
         self._agent_act_on_medium(action)
-        food_spent = self._agent_consume_stock(action)
         self._agent_lifecycle()
 
         self._medium_resource_dynamics()
         self._medium_diffuse_decay()
 
         num_agents = self._num_agents
-        total_fed = float(food_got.sum())
-        total_spent = float(food_spent.sum())
-        total_gain = max(0., total_fed - total_spent)
+        total_gain = energy_gain.sum()
         mean_gain = total_gain / num_agents if num_agents > 0 else 0.
         info = {
             'num_agents': num_agents,
-            'total_fed': total_fed,
-            'total_spent': total_spent,
             'total_reward': total_gain,
             'mean_reward': mean_gain,
         }
@@ -217,19 +212,20 @@ class Env(gym.Env[ObsType, ActType]):
         self.medium.loc[dict(channel='chem1')] += amount1 * self._get_agent_mask
         return amount1
 
-    # TODO: unify with agent_feed
-    def _agent_consume_stock(self, action: ActType) -> Array1C:
-        consumed = self.dynamics.op_action_cost(action)
-        self.agents.loc[dict(channel='agent_food')] -= consumed
-        return consumed
-
-    def _agent_feed(self) -> Array1C:
-        """Gains food from environment"""
+    def _agent_feed(self, action: AgtType) -> Array1C:
+        """Gains food from environment and consumes internal stock"""
+        # Feed from environment
         env_stock = self.medium.sel(channel='env_food')
         gained = self.dynamics.rate_feed * env_stock
-        self.agents.loc[dict(channel='agent_food')] += gained
+        # Update food in environment
         if not self.dynamics.food_infinite:
             self.medium.loc[dict(channel='env_food')] -= gained
+        # Consume internal energy stock to produce action
+        consumed = self.dynamics.op_action_cost(action)
+        gained -= consumed
+        # TODO: medium -> agents mapping needed
+        # Update agents array with the resulting gain
+        self.agents.loc[dict(channel='agent_food')] += gained
         return gained
 
     def _agent_lifecycle(self):
