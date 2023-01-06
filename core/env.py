@@ -136,6 +136,7 @@ class Env(gym.Env[ObsType, ActType]):
             return coords_array
 
     def _sel_by_agents(self, field: da.DataArray, only_alive=False) -> da.DataArray:
+        """Returns array of channels selected from field per agent in agents array."""
         coord_chans = ['x', 'y']
         # Pointwise approximate indexing:
         #  get mapping AGENT_IDX->ACTION as a sequence
@@ -166,7 +167,7 @@ class Env(gym.Env[ObsType, ActType]):
         # Update agent coordinates
         self.agents.loc[dict(channel=coord_chans)] = agent_coords_new
 
-        # Simpler logic relying on automatic coordinate alignment
+        # Simpler logic relying on automatic coordinate alignment; untested
         # agent_coords_new = self._agent_move_handle_boundary(self.agents + agent_actions)
         # self.agents.loc[dict(channel=coord_chans)] = agent_coords_new
 
@@ -214,18 +215,20 @@ class Env(gym.Env[ObsType, ActType]):
 
     def _agent_feed(self, action: AgtType) -> Array1C:
         """Gains food from environment and consumes internal stock"""
-        # Feed from environment
+        # Consume food from environment
         env_stock = self.medium.sel(channel='env_food')
-        gained = self.dynamics.rate_feed * env_stock
+        consumed = self.dynamics.rate_feed * env_stock * self._get_agent_mask
         # Update food in environment
         if not self.dynamics.food_infinite:
-            self.medium.loc[dict(channel='env_food')] -= gained
-        # Consume internal energy stock to produce action
-        consumed = self.dynamics.op_action_cost(action)
-        gained -= consumed
-        # TODO: medium -> agents mapping needed
+            self.medium.loc[dict(channel='env_food')] -= consumed
+
+        # Burn internal energy stock to produce action
+        burned = self.dynamics.op_action_cost(action)
+        gained = consumed - burned
+
         # Update agents array with the resulting gain
-        self.agents.loc[dict(channel='agent_food')] += gained
+        per_agent_gain = self._sel_by_agents(gained, only_alive=True)
+        self.agents.loc[dict(channel='agent_food')] += per_agent_gain
         return gained
 
     def _agent_lifecycle(self):
@@ -233,6 +236,7 @@ class Env(gym.Env[ObsType, ActType]):
         grows if has excess stock & favorable conditions."""
         have_food = self.agents.sel(channel='agent_food') > 1e-4
         self.agents = self.agents.where(have_food, 0)
+        # TODO: growing agents in favorable conditions
 
     def _get_alive_agents(self, view=True) -> AgtType:
         """Returns only agents which are alive, dropping dead agents from array."""
