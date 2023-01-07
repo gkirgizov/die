@@ -83,8 +83,10 @@ class DataInitializer:
         self._channels = {chan: np.zeros(field_size) for chan in channels or ()}
         self._name = name
 
-    def _mask(self, sampled: np.ndarray, mask_above_threshold: float = 1.0) -> np.ndarray:
-        mask = sampled < mask_above_threshold
+    def _mask(self, sampled: np.ndarray,
+              mask_below: float = 0.0,
+              mask_above: float = 1.0) -> np.ndarray:
+        mask = (mask_below <= sampled) & (sampled <= mask_above)
         return sampled * mask
 
     def _get_random(self, a=0., b=1.) -> np.ndarray:
@@ -118,17 +120,19 @@ class DataInitializer:
         return self
 
     def with_agents(self, ratio: float):
-        agents = np.ceil(self._mask(self._get_random(), mask_above_threshold=ratio))
+        agents = np.ceil(self._mask(self._get_random(), mask_above=ratio))
         self._channels['agents'] = agents
         # self._channels['agent_food'] = agents * self._get_random(0.1, 0.2)
         return self
 
     def with_food_perlin(self, threshold: float = 0.25):
-        self._channels['env_food'] = self._mask(self._get_perlin(), threshold)
+        self._channels['env_food'] = self._mask(self._get_perlin(),
+                                                mask_above=threshold)
         return self
 
     def with_chem(self, threshold: float = 0.1):
-        self._channels['chem1'] = self._mask(self._get_perlin(octaves=24), threshold)
+        self._channels['chem1'] = self._mask(self._get_perlin(octaves=24),
+                                             mask_above=threshold)
         return self
 
     def build_numpy(self) -> np.ndarray:
