@@ -24,15 +24,22 @@ class BoundaryCondition(Enum):
     limit = 'limit'
 
 
-def default_cost(action: ActType):
+def linear_action_cost(action: ActType, weights=(0.02, 0.01)) -> Array1C:
+    # Default cost of actions is computed as linear combination of:
+    #  total crossed distance plus chemical deposition
     dist = np.linalg.norm(action.sel(channel=['dx', 'dy']), axis=0)
-    cost = 0.5 * action.sel(channel='deposit1') + 0.25 * dist
+    deposit = action.sel(channel='deposit1')
+    cost = weights[0] * deposit + weights[1] * dist
     return cost
+
+
+def zero_cost(action: ActType) -> Array1C:
+    return np.zeros(action.shape[1:])
 
 
 @dataclass
 class Dynamics:
-    op_action_cost: CostOperator = default_cost
+    op_action_cost: CostOperator = linear_action_cost
     op_food_flow: FoodOperator = lambda x: x
     rate_feed: float = 0.1  # TODO: maybe do lambda taking into account input?
     rate_decay_chem: float = 0.025
@@ -227,7 +234,6 @@ class Env(gym.Env[ObsType, ActType]):
 
         # Burn internal energy stock to produce action
         burned = self.dynamics.op_action_cost(action)
-        burned = 0
         gained = consumed - burned
         # Update agents array with the resulting gain
         per_agent_gain = self._sel_by_agents(gained, only_alive=False)
