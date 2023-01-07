@@ -55,7 +55,7 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_food_perlin(threshold=1.0) \
-            .with_agents(ratio=0.05) \
+            .with_agents(ratio=0.1) \
             .build(name='medium')
 
         self.agents = DataInitializer.agents_from_medium(self.medium)
@@ -141,6 +141,7 @@ class Env(gym.Env[ObsType, ActType]):
         # Pointwise approximate indexing:
         #  get mapping AGENT_IDX->ACTION as a sequence
         #  details: https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
+        # TODO: alive selection doesn't work
         agents = self._get_alive_agents() if only_alive else self.agents
         cell_indexer = {coord_ch: agents.sel(channel=coord_ch)
                         for coord_ch in coord_chans}
@@ -227,7 +228,7 @@ class Env(gym.Env[ObsType, ActType]):
         gained = consumed - burned
 
         # Update agents array with the resulting gain
-        per_agent_gain = self._sel_by_agents(gained, only_alive=True)
+        per_agent_gain = self._sel_by_agents(gained, only_alive=False)
         self.agents.loc[dict(channel='agent_food')] += per_agent_gain
         return gained
 
