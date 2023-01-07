@@ -37,6 +37,9 @@ class Dynamics:
     # test options?
     food_infinite: bool = True
 
+    # Initialization options
+    init_agent_ratio: float = 0.1
+
     @staticmethod
     def default_cost(action: ActType):
         dist = np.linalg.norm(action.sel(channel=['dx', 'dy']), axis=0)
@@ -53,18 +56,18 @@ class Env(gym.Env[ObsType, ActType]):
         self.coordgrid = utils.get_meshgrid(field_size)
         # self.coordsteps = np.abs(self.coordgrid[:, 1] - self.coordgrid[:, 0])
 
+        self.dynamics = dynamics or Dynamics(op_action_cost=Dynamics.default_cost,
+                                             rate_feed=0.1,
+                                             rate_decay_chem=0.001)
+
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_food_perlin(threshold=1.0) \
-            .with_agents(ratio=0.1) \
+            .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
 
         self.agents = DataInitializer.agents_from_medium(self.medium)
 
         self.buffer_medium = self.medium.copy(deep=True)
-
-        self.dynamics = dynamics or Dynamics(op_action_cost=Dynamics.default_cost,
-                                             rate_feed=0.1,
-                                             rate_decay_chem=0.001)
 
     def _rotate_agent_buffer(self, reset_data=0.):
         tmp = self.medium
@@ -225,7 +228,12 @@ class Env(gym.Env[ObsType, ActType]):
 
         # Burn internal energy stock to produce action
         burned = self.dynamics.op_action_cost(action)
+        burned = 0
         gained = consumed - burned
+
+        logging.info(f'Food consumed: {np.sum(np.array(consumed)):.3f}'
+                     f', burned: {np.sum(np.array(burned)):.3f}'
+                     f', total gain: {np.sum(np.array(gained)):.3f}')
 
         # Update agents array with the resulting gain
         per_agent_gain = self._sel_by_agents(gained, only_alive=False)

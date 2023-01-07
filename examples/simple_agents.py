@@ -1,3 +1,5 @@
+import logging
+
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -47,6 +49,8 @@ def try_gradient_agent(**kwargs):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+
     # field_size = (256, 256)
     # field_size = (128, 128)
     field_size = (32, 32)
