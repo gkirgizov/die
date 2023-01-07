@@ -49,6 +49,8 @@ class Dynamics:
 
     # test options?
     food_infinite: bool = False
+    agents_die: bool = False
+    agents_born: bool = False
 
     # Initialization options
     init_agent_ratio: float = 0.1
@@ -251,9 +253,21 @@ class Env(gym.Env[ObsType, ActType]):
     def _agent_lifecycle(self):
         """Dies if consumed all internal stock,
         grows if has excess stock & favorable conditions."""
-        have_food = self.agents.sel(channel='agent_food') > 1e-4
-        self.agents = self.agents.where(have_food, 0)
-        # TODO: growing agents in favorable conditions
+        if self.dynamics.agents_die:
+            have_food = self.agents.sel(channel='agent_food') > 1e-4
+            self.agents = self.agents.where(have_food, 0)
+
+            # alive_agents = np.sum(np.array(have_food))
+            # dead_agents = self._num_agents - alive_agents
+            # logging.info(f'Agents alive: {alive_agents}, died: {dead_agents}')
+
+        if self.dynamics.agents_born:
+            # TODO: growing agents in favorable conditions
+            # enough_neighbours
+            # enough_neighbour_food
+            # enough_food = self.agents.sel(channel='agent_food') > 0.5
+            pass
+
 
     def _get_alive_agents(self, view=True) -> AgtType:
         """Returns only agents which are alive, dropping dead agents from array."""

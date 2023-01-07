@@ -12,7 +12,8 @@ def try_agent_action(agent: Agent,
                      iters=1000,
                      show_each=-1,
                      ):
-    env = Env(field_size, Dynamics(init_agent_ratio=0.01))
+    env = Env(field_size, Dynamics(init_agent_ratio=0.1,
+                                   food_infinite=True))
 
     for i in tqdm(range(1, iters+1)):
         obs = env._get_current_obs
@@ -21,9 +22,13 @@ def try_agent_action(agent: Agent,
         # env._agent_move_async(action)
         env._agent_move(action)
         env._agents_to_medium()
+
         env._agent_feed(action)
-        # env._agent_act_on_medium(action)
+        env._agent_act_on_medium(action)
+        env._agent_lifecycle()
+
         env._medium_diffuse_decay()
+        # env._medium_resource_dynamics()
 
         if show_each > 0 and i % show_each == 0:
             num_agents = env._num_agents
@@ -52,8 +57,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
     # field_size = (256, 256)
-    # field_size = (128, 128)
-    field_size = (32, 32)
+    field_size = (128, 128)
+    # field_size = (32, 32)
     # try_const_agent(field_size=field_size, show_each=8)
     try_random_agent(field_size=field_size, show_each=20)
     # try_gradient_agent(field_size=field_size, show_each=20)
