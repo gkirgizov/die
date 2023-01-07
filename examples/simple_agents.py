@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from core.agent import ConstAgent, Agent, RandomAgent, GradientAgent
+from core.base_types import ActType
 from core.env import Env, Dynamics
 
 
@@ -15,10 +16,7 @@ def try_agent_action(agent: Agent,
     env = Env(field_size, Dynamics(init_agent_ratio=0.1,
                                    food_infinite=True))
 
-    for i in tqdm(range(1, iters+1)):
-        obs = env._get_current_obs
-        action = agent.forward(obs)
-
+    def manual_step(action: ActType):
         # env._agent_move_async(action)
         env._agent_move(action)
         env._agents_to_medium()
@@ -27,13 +25,23 @@ def try_agent_action(agent: Agent,
         env._agent_act_on_medium(action)
         env._agent_lifecycle()
 
+        env._medium_resource_dynamics()
         env._medium_diffuse_decay()
-        # env._medium_resource_dynamics()
+
+        return env._get_current_obs, 0, False, False, {}
+
+    obs = env._get_current_obs
+    for i in tqdm(range(1, iters+1)):
+        action = agent.forward(obs)
+
+        # obs, _, _, _, stats = manual_step(action)
+        obs, _, _, _, stats = env.step(action)
 
         if show_each > 0 and i % show_each == 0:
             num_agents = env._num_agents
             print(f'drawing progress at iteration {i}: '
                   f'num_agents={num_agents}')
+            print(stats)
             env.plot()
             plt.show()
 
@@ -60,6 +68,6 @@ if __name__ == '__main__':
     field_size = (128, 128)
     # field_size = (32, 32)
     # try_const_agent(field_size=field_size, show_each=8)
-    try_random_agent(field_size=field_size, show_each=20)
+    try_random_agent(field_size=field_size, show_each=50)
     # try_gradient_agent(field_size=field_size, show_each=20)
 
