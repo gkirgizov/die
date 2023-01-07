@@ -30,17 +30,17 @@ def try_agent_action(agent: Agent,
 
         return env._get_current_obs, 0, False, False, {}
 
+    total_reward = 0
     obs = env._get_current_obs
+
     for i in tqdm(range(1, iters+1)):
         action = agent.forward(obs)
-
-        # obs, _, _, _, stats = manual_step(action)
-        obs, _, _, _, stats = env.step(action)
+        obs, reward, _, _, stats = env.step(action)
+        total_reward += reward
 
         if show_each > 0 and i % show_each == 0:
-            num_agents = env._num_agents
             print(f'drawing progress at iteration {i}: '
-                  f'num_agents={num_agents}')
+                  f'total_reward={total_reward}')
             print(stats)
             env.plot()
             plt.show()
@@ -57,7 +57,7 @@ def try_random_agent(**kwargs):
 
 
 def try_gradient_agent(**kwargs):
-    agent = GradientAgent(scale=0.1, deposit=0.1, kind='gaussian_noise')
+    agent = GradientAgent(scale=0.3, deposit=0.1, kind='gaussian_noise')
     try_agent_action(agent, **kwargs)
 
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     # field_size = (256, 256)
     field_size = (128, 128)
     # field_size = (32, 32)
-    # try_const_agent(field_size=field_size, show_each=8)
-    try_random_agent(field_size=field_size, show_each=50)
-    # try_gradient_agent(field_size=field_size, show_each=20)
+    try_const_agent(field_size=field_size, show_each=200)
+    # try_random_agent(field_size=field_size, show_each=50)
+    # try_gradient_agent(field_size=field_size, show_each=50)
 

@@ -100,13 +100,13 @@ class Env(gym.Env[ObsType, ActType]):
 
         num_agents = self._num_agents
         total_gain = energy_gain.sum()
-        mean_gain = total_gain / num_agents if num_agents > 0 else 0.
+        reward = float(total_gain.values)
+        mean_gain = reward / num_agents if num_agents > 0 else 0.
         info = {
             'num_agents': num_agents,
-            'total_reward': total_gain,
+            'reward': reward,
             'mean_reward': mean_gain,
         }
-        reward = total_gain
         terminated = num_agents == 0
         truncated = False
 

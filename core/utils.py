@@ -9,7 +9,7 @@ from core.base_types import MediumType, AgtType
 
 
 def plot_medium(medium: MediumType, agents: AgtType,
-                size: int = 8, aspect: float = 1.0,
+                size: float = 8, aspect: float = 1.0,
                 with_grid_agents=False):
     # Setup figure with subplots
     figheight = size
