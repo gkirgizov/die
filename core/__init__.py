@@ -1,7 +1,7 @@
 
 """
 Plan
-- [ ] Stage 0.1: const moving
+- [x] Stage 0.1: const moving
 - [ ] Stage 0.2: classic physarum? without feeding/dying; just moving
 - [ ] Stage 0.3: basic intelligance: some obviously working learning agent (e.g. evolutionary)
 -- can write an article here; publish as a new Env for ALife research
@@ -32,12 +32,13 @@ Necessary core
         - [x] agents feed & consume
     Bugs
     - [x] sort out why agents are ...lost?...
+    - [ ] only alive selection -- is it working?
     - [ ] BUG with agents feeding somehow unconstrained growth from where? from collisions?
           what can it be? possibly it's data collisions in 'feeding' step.
           try rewriting it step-by-step
 
 - [x] plotting agents array with food etc.
-- [ ] plotting LIVE
+- [x] plotting LIVE
 - [ ] medium food dynamics -- const | random add
 - [x] agent action cost -- not obvious & important
 
@@ -73,8 +74,8 @@ Important core enhancements:
 Aux: plotting
 - plotting NB: all tests are isolated visual cases, really
   maybe with some statistical tests *over the image*
-- [ ] aspect ratio
-- [ ] subplot with agent stats
+- [x] aspect ratio
+- [x] subplot with agent stats
 - [ ] subplot with agent sense neighbourhoods?
 - [ ] advanced dynamic vis (see https://docs.xarray.dev/en/stable/user-guide/plotting.html)
 
