@@ -16,28 +16,30 @@ Necessary core
 - [x] fix MockConstAgent
 - [x] test agent moving
 - [x] make buffered update more efficient
-- [ ] 0.1: agent moving separate coords separately!
-    - [x] do I need normal coord storing in channels for this? to be simpler? seems like yes.
+- [x] 0.1: agent moving separate coords separately!
+    - [x] add agent info array with purely informational unordered unindexed array
     - [x] make & test DataInitializer for new agents, subst usages of its methods
         - [x] agents from medium MAPPING
         - [x] get_current_obs
         - [x] modify simple agents
         - [x] check postprocess action in Agent
         - [x] test mapping & DataInit
-    - [ ] return agents map to field? make a separate method for mapping them
+    - [x] return agents map to field? make a separate method for mapping them
         - [x] consider alive agents only
-        - [ ] think if needed doing this in-the-loop ?
+        - [x] --think if needed doing this in-the-loop ?
+        - [x] rewrite other methods:
         - [x] agents lifecycle & deposit
-        - [ ] agents feed & consume
+        - [x] agents feed & consume
+    Bugs
     - [x] sort out why agents are ...lost?...
-    - [ ] add consideration of alive/not
-    - [ ] rewrite other methods
-    full move loop
-    - [ ] add agent info array with purely informational unordered unindexed array
-    - [ ] at which step agennts are mapped to Medium field? ONLY before observe?
-    - [ ] ?? how to get mapping of INDS -> XY ?? XY -> INDS to update stored coords ??
-        - get_agent_indexer of INDS->XY i.e. first get of both BASE for INDEXER && DELTA for MOVE
-    - [ ] add some *native* collision resolution -- natural stochasticity of agents
+    - [ ] BUG with agents feeding somehow unconstrained growth from where? from collisions?
+          what can it be? possibly it's data collisions in 'feeding' step.
+          try rewriting it step-by-step
+
+- [x] plotting agents array with food etc.
+- [ ] plotting LIVE
+- [ ] medium food dynamics -- const | random add
+- [x] agent action cost -- not obvious & important
 
 - [x] some boundary conditions
 - [x] medium diffusion & decay
@@ -45,16 +47,19 @@ Necessary core
       some summing-up kernel that determines direction?
       like *chemical-weighted sum of coordinates*? then we get direction vector.
       ah, I see! that's like *a specific case of general convolving agent* with const-linear weigth mask!
-- [ ] make full loop!
+      - [ ] understand why gradient agent doesn't return the characteristic pattern of physarum?
+            ?add some inertia coefficient
+            ?or possibly add requirement for *continuity* of the *derivative* (1st or 2nd order)
+      - [ ] reproduce physarum environment with basics (no food, just inertia)
+      - [ ] add some *native* collision resolution -- natural stochasticity of agents
+
+      - [ ] setup clear Reward & performance characteristics (allmost done)
+      - [ ] setup baseline Dynamics hyperparams
+            criteria is some baseline performance of Random agent
+
 -- does that count as a paper on generalisation of original Physarum paper? making it continuous?
    how about Lenia?
    sounds like not quite; small incremental enhancement.
-
-- [ ] medium food dynamics -- const | random add
-- [ ] agent sense mask: gauss + ceiling
-- [ ] agent lifecycle
-- [ ] agent feeding
-- [ ] agent action cost -- not obvious & important
 
 - [ ] get some avg stats (like a reward)
 - [ ] ...
