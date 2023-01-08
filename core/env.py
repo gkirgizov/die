@@ -146,13 +146,12 @@ class Env(gym.Env[ObsType, ActType]):
                             f'Doing nothing with boundary...')
             return coords_array
 
-    def _sel_by_agents(self, field: da.DataArray, only_alive=False) -> da.DataArray:
+    def _sel_by_agents(self, field: da.DataArray, only_alive=True) -> da.DataArray:
         """Returns array of channels selected from field per agent in agents array."""
         coord_chans = ['x', 'y']
         # Pointwise approximate indexing:
         #  get mapping AGENT_IDX->ACTION as a sequence
         #  details: https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
-        # TODO: alive selection doesn't work
         agents = self._get_alive_agents() if only_alive else self.agents
         cell_indexer = {coord_ch: agents.sel(channel=coord_ch)
                         for coord_ch in coord_chans}
@@ -162,7 +161,7 @@ class Env(gym.Env[ObsType, ActType]):
     def _medium_agent_coords(self) -> Dict:
         # coord_chans = self.medium.coords[1:]
         coord_chans = ['x', 'y']
-        agent_cells = self._sel_by_agents(self.medium)
+        agent_cells = self._sel_by_agents(self.medium, only_alive=True)
         agent_coords = {ch: agent_cells.coords[ch] for ch in coord_chans}
         return agent_coords
 
@@ -171,7 +170,7 @@ class Env(gym.Env[ObsType, ActType]):
         delta_chans = ['dx', 'dy']
 
         # Map action *grid* to *1d* agent-like array
-        agent_actions = self._sel_by_agents(action)
+        agent_actions = self._sel_by_agents(action, only_alive=False)
         # Compute new positions, don't forget about boundary conditions
         agent_coords = self.agents.sel(channel=coord_chans).to_numpy()
         delta_coords = agent_actions.sel(channel=delta_chans).to_numpy()
@@ -238,8 +237,9 @@ class Env(gym.Env[ObsType, ActType]):
         burned = self.dynamics.op_action_cost(action)
         gained = consumed - burned
         # Update agents array with the resulting gain
+        alive_mask = self.agents.sel(channel='alive') > 0
         per_agent_gain = self._sel_by_agents(gained, only_alive=False)
-        self.agents.loc[dict(channel='agent_food')] += per_agent_gain
+        self.agents.loc[dict(channel='agent_food')] += per_agent_gain * alive_mask
         agent_stock = self.agents.sel(channel="agent_food")
 
         logging.info(f'Food consumed: {np.sum(np.array(consumed)):.3f}'
@@ -268,11 +268,14 @@ class Env(gym.Env[ObsType, ActType]):
             # enough_food = self.agents.sel(channel='agent_food') > 0.5
             pass
 
-
-    def _get_alive_agents(self, view=True) -> AgtType:
+    def _get_alive_agents(self, view=False) -> AgtType:
         """Returns only agents which are alive, dropping dead agents from array."""
-        agent_inds = self.agents.sel(channel='alive').values.nonzero()[0]
-        alive_agents = self.agents.isel(index=agent_inds) if view else self.agents[agent_inds]
+        agent_inds = (self.agents.sel(channel='alive') > 0).values.nonzero()[0]
+        if view:
+            alive_agents = self.agents.isel(index=agent_inds)
+        else:
+            indexer = dict(index=da.DataArray(agent_inds))
+            alive_agents = self.agents[indexer]
         return alive_agents
 
     @property
