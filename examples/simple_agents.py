@@ -11,7 +11,7 @@ from core.env import Env, Dynamics
 def try_agent_action(agent: Agent,
                      field_size=(256, 256),
                      iters=1000,
-                     show_each=-1,
+                     show_each=1,
                      ):
     env = Env(field_size, Dynamics(init_agent_ratio=0.1,
                                    food_infinite=True))
@@ -42,7 +42,7 @@ def try_agent_action(agent: Agent,
             print(f'drawing progress at iteration {i}: '
                   f'total_reward={total_reward}')
             print(stats)
-            env.plot()
+            env.render()
             plt.show()
 
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     # field_size = (256, 256)
     field_size = (128, 128)
     # field_size = (32, 32)
-    try_const_agent(field_size=field_size, show_each=200)
-    # try_random_agent(field_size=field_size, show_each=50)
-    # try_gradient_agent(field_size=field_size, show_each=50)
+    # try_const_agent(field_size=field_size)
+    # try_random_agent(field_size=field_size)
+    try_gradient_agent(field_size=field_size)
 

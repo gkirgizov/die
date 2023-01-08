@@ -15,6 +15,7 @@ from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperat
     Array1C
 from core.data_init import DataInitializer
 from core import utils
+from core.utils import EnvDrawer
 
 RenderFrame = TypeVar('RenderFrame')
 
@@ -77,6 +78,9 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.buffer_medium = self.medium.copy(deep=True)
 
+        self._drawer = EnvDrawer(field_size, size=6, aspect=self._get_aspect_ratio)
+        self._drawer.show(self.medium, self.agents)  # initial show
+
     def _rotate_agent_buffer(self, reset_data=0.):
         tmp = self.medium
         self.medium = self.buffer_medium
@@ -113,11 +117,7 @@ class Env(gym.Env[ObsType, ActType]):
         return self._get_current_obs, reward, terminated, truncated, info
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
-        pass
-
-    def plot(self, size: float = 8):
-        return utils.plot_medium(self.medium, self.agents,
-                                 size=size, aspect=self._get_aspect_ratio)
+        return self._drawer.draw(self.medium, self.agents)
 
     def _medium_diffuse_decay(self):
         """Applies per-channel diffusion, channel-specific."""
