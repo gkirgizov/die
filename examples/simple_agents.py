@@ -13,7 +13,7 @@ def try_agent_action(agent: Agent,
                      iters=1000,
                      show_each=1,
                      ):
-    env = Env(field_size, Dynamics(init_agent_ratio=0.1,
+    env = Env(field_size, Dynamics(init_agent_ratio=0.8,
                                    food_infinite=True))
 
     def manual_step(action: ActType):
@@ -57,8 +57,8 @@ def try_random_agent(**kwargs):
 
 
 def try_gradient_agent(**kwargs):
-    agent = GradientAgent(inertia=0.95, scale=1.0, deposit=0.25,
-                          kind='gaussian_noise', noise_scale=0.025)
+    agent = GradientAgent(inertia=0.95, scale=1.0, deposit=0.005,
+                          kind='gaussian_noise', noise_scale=0.015)
     try_agent_action(agent, **kwargs)
 
 

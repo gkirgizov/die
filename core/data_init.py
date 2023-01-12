@@ -115,6 +115,10 @@ class DataInitializer:
         self._channels[channel] += data * mask
         return self
 
+    def with_const(self, channel: str, value=0.):
+        self._channels[channel] = np.full(self._size, value, dtype=np.float)
+        return self
+
     def with_noise(self, channel: str, a=0, b=1):
         self._channels[channel] = self._get_random(a, b)
         return self

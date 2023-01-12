@@ -43,10 +43,10 @@ class Dynamics:
     op_action_cost: CostOperator = linear_action_cost
     op_food_flow: FoodOperator = lambda x: x
     rate_feed: float = 0.1  # TODO: maybe do lambda taking into account input?
-    rate_decay_chem: float = 0.025
+    rate_decay_chem: float = 0.001
     boundary: BoundaryCondition = BoundaryCondition.wrap
     diffuse_mode: str = 'wrap'
-    diffuse_sigma: float = 0.5
+    diffuse_sigma: float = 3.0
 
     # test options?
     food_infinite: bool = False
@@ -71,6 +71,7 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_food_perlin(threshold=1.0) \
+            .with_const('env_food', 0.5) \
             .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
 
