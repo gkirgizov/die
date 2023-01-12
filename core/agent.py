@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import Optional, Union, List, Tuple, TypeVar, Callable
+from typing import Optional, Union, List, Tuple, TypeVar, Callable, Sequence
 
 import numpy as np
 import xarray as da
@@ -65,30 +65,48 @@ class GradientAgent(Agent):
     kinds = ('const', 'gaussian_noise')
 
     def __init__(self,
-                 scale: float = 0.1,
+                 scale: float = 1.0,
                  deposit: float = 0.1,
-                 kind: Optional[str] = None,
+                 inertia: float = 0.5,
+                 kind: str = 'gaussian_noise',
+                 noise_scale: float = 0.025,
                  ):
+        if kind not in self.kinds:
+            raise ValueError(f'Unknown kind of agent {kind}')
         self._rng = np.random.default_rng()
         self._kind = kind or self.kinds[0]
-        self._deposit = deposit
+        self._noise_scale = noise_scale
         self._scale = scale
+        self._deposit = deposit
+        self._inertia = inertia
+        self._grads_buffer = [0] * 2  # initially zeros
 
     def forward(self, obs: ObsType) -> ActType:
+        coords = ['dx', 'dy']
         agents, medium = obs
         action = DataInitializer.init_action_for(medium)
 
         # Compute chemical gradient
+        grads_buffer = []
         chemical = medium.sel(channel='chem1')
-        grad_x, grad_y = np.gradient(chemical)
+        grads = np.gradient(chemical)
+        for coord, grad_i, prev_grad_i in zip(coords, grads, self._grads_buffer):
+            # Add some noise
+            if self._kind == 'gaussian_noise':
+                noise = self._noise_scale * self._rng.normal(loc=0., scale=0.4, size=grad_i.shape)
+            else:
+                noise = 0
+            # Compute gradient (i.e. direction) with inertia
+            grad_val = (1 - self._inertia) * grad_i + self._inertia * prev_grad_i
+            grads_buffer.append(grad_val)
+            # Compute final value
+            action.loc[dict(channel=coord)] = (grad_val + noise) * self._scale
+        self._grads_buffer = grads_buffer
 
-        action.loc[dict(channel='dx')] = grad_x * self._scale
-        action.loc[dict(channel='dy')] = grad_y * self._scale
-        # const chemical deposit
-        action.loc[dict(channel='deposit1')] = self._deposit
-
-        if self._kind == 'gaussian_noise':
-            action *= self._rng.normal(loc=1., scale=0.4, size=action.shape)
+        # Chemical deposit relative to discovered food
+        medium_food = medium.sel(channel='env_food')
+        deposit = self._deposit * medium_food
+        action.loc[dict(channel='deposit1')] = deposit
 
         # return self.postprocess_action(agents, action)
         return action

@@ -57,15 +57,16 @@ def try_random_agent(**kwargs):
 
 
 def try_gradient_agent(**kwargs):
-    agent = GradientAgent(scale=0.3, deposit=0.1, kind='gaussian_noise')
+    agent = GradientAgent(inertia=0.95, scale=1.0, deposit=0.25,
+                          kind='gaussian_noise', noise_scale=0.025)
     try_agent_action(agent, **kwargs)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    # field_size = (256, 256)
-    field_size = (128, 128)
+    field_size = (256, 256)
+    # field_size = (128, 128)
     # field_size = (32, 32)
     # try_const_agent(field_size=field_size)
     # try_random_agent(field_size=field_size)
