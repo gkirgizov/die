@@ -1,4 +1,4 @@
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,13 +8,35 @@ from xarray import plot
 from core.base_types import MediumType, AgtType
 
 
-class EnvDrawer:
+class FieldTrace:
+    def __init__(self,
+                 field_size: Tuple[int, int],
+                 trace_steps: int = 10,
+                 ):
+        self._decay = 1 - 1 / trace_steps
+        self._trace_field = np.zeros(field_size)
 
+    @property
+    def trace(self) -> np.ndarray:
+        return self._trace_field
+
+    def as_mask(self, inverse=False):
+        if inverse:
+            return 1. - self._trace_field
+        else:
+            return self._trace_field
+
+    def update(self, field):
+        self._trace_field = self._trace_field * self._decay + field
+
+
+class EnvDrawer:
     def __init__(self,
                  field_size: Tuple[int, int],
                  size: float = 8,
                  aspect: float = 1.0,
-                 with_grid_agents=False):
+                 with_grid_agents=False,
+                 with_agent_trace=False):
         # Setup figure with subplots
         figheight = size
         figwidth = size * aspect
@@ -23,21 +45,26 @@ class EnvDrawer:
                                      gridspec_kw={'width_ratios': [1, 1]})
 
         self.field_size = field_size
-        self.medium_ax, self.agent_ax = axs
-        self._init_agent_ax(with_grid=with_grid_agents)
-        self._artist_medium = None
-        self._artist_agents = None
+        medium_ax, agent_ax = axs
+        self._agent_trace = FieldTrace(field_size)
+        self._disable_ticks(agent_ax, with_grid=with_grid_agents)
+
+        self._drawers = [
+            (medium_ax, self._upd_img_medium),
+            (agent_ax, self._upd_img_agents),
+            # (agent_trace_ax, self._upd_img_trace),
+        ]
+        self._artists = []
         # self.cmap = 'viridis'
         plt.ion()
 
-    def _init_agent_ax(self, with_grid: bool):
+    def _disable_ticks(self, ax: plt.Axes, with_grid: bool):
         width, height = self.field_size
-        ax = self.agent_ax
         # Set display of agent array with grid lines etc.
         ax.tick_params(axis='both', which='both',
-                             bottom=False, labelbottom=False,
-                             left=False, labelleft=False,
-                             )
+                       bottom=False, labelbottom=False,
+                       left=False, labelleft=False,
+                       )
         if with_grid:
             ax.set_xticks(np.arange(0, width))
             ax.set_yticks(np.arange(0, height))
@@ -75,21 +102,20 @@ class EnvDrawer:
 
     def show(self, medium: MediumType, agents: AgtType):
         """Called for initial show at interactive usage or for static show"""
-        medium_data_rgb = self._upd_img_medium(medium)
-        self._artist_medium = self.medium_ax.imshow(medium_data_rgb)
-
-        agents_data_rgb = self._upd_img_agents(agents)
-        self._artist_agents = self.agent_ax.imshow(agents_data_rgb)
+        inputs = [medium, agents]
+        for (ax, drawer), input_data in zip(self._drawers, inputs):
+            img = drawer(input_data)
+            artist = ax.imshow(img)
+            self._artists.append(artist)
 
     def draw(self, medium: MediumType, agents: AgtType):
-        if not self._artist_medium or not self._artist_agents:
+        if not self._artists:
             raise ValueError("First call initial `show` for initialising images.")
 
-        medium_data_rgb = self._upd_img_medium(medium)
-        self._artist_medium.set_data(medium_data_rgb)
-
-        agents_data_rgb = self._upd_img_agents(agents)
-        self._artist_agents.set_data(agents_data_rgb)
+        inputs = [medium, agents]
+        for (ax, drawer), artist, input_data in zip(self._drawers, self._artists, inputs):
+            img = drawer(input_data)
+            artist.set_data(img)
 
         # TODO: add consideration of 'is_visible'
         plt.draw()
