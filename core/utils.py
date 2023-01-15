@@ -11,7 +11,7 @@ from core.base_types import MediumType, AgtType
 class FieldTrace:
     def __init__(self,
                  field_size: Tuple[int, int],
-                 trace_steps: int = 10,
+                 trace_steps: int = 8,
                  ):
         self._decay = 1 - 1 / trace_steps
         self._trace_field = np.zeros(field_size)
@@ -40,25 +40,29 @@ class EnvDrawer:
         # Setup figure with subplots
         figheight = size
         figwidth = size * aspect
-        figsize = (figwidth * 2, figheight)
-        self.fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsize,
-                                     gridspec_kw={'width_ratios': [1, 1]})
+        figsize = (figwidth * 2, figheight * 2)
+        self.fig, axs = plt.subplots(nrows=2, ncols=2, figsize=figsize,
+                                     gridspec_kw={'width_ratios': [1, 1],
+                                                  'height_ratios': [1, 1]})
 
         self.field_size = field_size
-        medium_ax, agent_ax = axs
+        (medium_ax, trace_ax), (agent_ax, spare_ax) = axs
         self._agent_trace = FieldTrace(field_size)
+        self._disable_ticks(trace_ax)
         self._disable_ticks(agent_ax, with_grid=with_grid_agents)
+        self._disable_ticks(spare_ax)
 
         self._drawers = [
             (medium_ax, self._upd_img_medium),
             (agent_ax, self._upd_img_agents),
-            # (agent_trace_ax, self._upd_img_trace),
+            (trace_ax, self._upd_img_trace),
+            (spare_ax, self._upd_img_dummy),
         ]
         self._artists = []
         # self.cmap = 'viridis'
         plt.ion()
 
-    def _disable_ticks(self, ax: plt.Axes, with_grid: bool):
+    def _disable_ticks(self, ax: plt.Axes, with_grid: bool = False):
         width, height = self.field_size
         # Set display of agent array with grid lines etc.
         ax.tick_params(axis='both', which='both',
@@ -71,7 +75,17 @@ class EnvDrawer:
             ax.xaxis.grid(True)
             ax.yaxis.grid(True)
 
-    def _upd_img_medium(self, medium: MediumType) -> np.ndarray:
+    @property
+    def img_shape(self) -> Tuple[int, int]:
+        width, height = self.field_size
+        img_shape = (height, width)
+        return img_shape
+
+    def _upd_img_dummy(self, *args) -> np.ndarray:
+        width, height = self.field_size
+        return np.ones((height, width, 3))
+
+    def _upd_img_medium(self, medium: MediumType, agents: AgtType) -> np.ndarray:
         """Returns RGB/RGBA image ready for imshow"""
         # Setup medium plot
         medium_data = medium.sel(channel=['agents', 'env_food', 'chem1'])
@@ -79,7 +93,17 @@ class EnvDrawer:
         medium_data_rgb = medium_data.values.transpose((1, 2, 0))
         return medium_data_rgb
 
-    def _upd_img_agents(self, agents: AgtType) -> np.ndarray:
+    def _upd_img_trace(self, medium: MediumType, agents: AgtType) -> np.ndarray:
+        self._agent_trace.update(medium.sel(channel='agents'))
+        trace_channel = self._agent_trace.as_mask()
+        zero_channel = np.zeros(self.img_shape)
+        data_rgb = np.stack([trace_channel,
+                             trace_channel,
+                             trace_channel,
+                             ], axis=-1)
+        return data_rgb
+
+    def _upd_img_agents(self, medium: MediumType, agents: AgtType) -> np.ndarray:
         """Returns RGB/RGBA image ready for imshow"""
         # Setup plot of agents
         width, height = self.field_size
@@ -102,9 +126,8 @@ class EnvDrawer:
 
     def show(self, medium: MediumType, agents: AgtType):
         """Called for initial show at interactive usage or for static show"""
-        inputs = [medium, agents]
-        for (ax, drawer), input_data in zip(self._drawers, inputs):
-            img = drawer(input_data)
+        for ax, drawer in self._drawers:
+            img = drawer(medium, agents)
             artist = ax.imshow(img)
             self._artists.append(artist)
 
@@ -112,9 +135,8 @@ class EnvDrawer:
         if not self._artists:
             raise ValueError("First call initial `show` for initialising images.")
 
-        inputs = [medium, agents]
-        for (ax, drawer), artist, input_data in zip(self._drawers, self._artists, inputs):
-            img = drawer(input_data)
+        for (ax, drawer), artist in zip(self._drawers, self._artists):
+            img = drawer(medium, agents)
             artist.set_data(img)
 
         # TODO: add consideration of 'is_visible'

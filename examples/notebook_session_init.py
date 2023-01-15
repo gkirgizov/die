@@ -7,7 +7,7 @@ from core.base_types import ActType, ObsType, MaskType, CostOperator, DataChanne
 from core.data_init import DataInitializer
 from core.env import Env
 from core.agent import Agent
-from core.utils import plot_medium
+from core.utils import EnvDrawer
 
 
 def get_test_fields(field_size, agents_ratio=0.2):
@@ -26,8 +26,9 @@ def get_test_fields(field_size, agents_ratio=0.2):
 
 
 # Get & plot
-medium, agents, action = get_test_fields((8, 6))
-plot_medium(medium, agents)
+field_sz = (8, 6)
+medium, agents, action = get_test_fields(field_sz)
+EnvDrawer(field_sz).show(medium, agents)
 plt.show()
 
 # Receipt for data assignment by approximate coords
