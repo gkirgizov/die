@@ -3,6 +3,7 @@ from functools import lru_cache
 from typing import Optional, Union, List, Tuple, TypeVar, Callable, Sequence
 
 import numpy as np
+from sklearn.preprocessing import normalize
 import xarray as da
 import gymnasium as gym
 
@@ -67,6 +68,7 @@ class GradientAgent(Agent):
                  inertia: float = 0.5,
                  kind: str = 'gaussian_noise',
                  noise_scale: float = 0.025,
+                 normalized_grad: bool = False,
                  ):
         if kind not in self.kinds:
             raise ValueError(f'Unknown kind of agent {kind}')
@@ -77,6 +79,7 @@ class GradientAgent(Agent):
         self._scale = scale
         self._deposit = deposit
         self._inertia = inertia
+        self._normalized = normalized_grad
         self._prev_grad = self._get_some_noise()
 
     def _get_some_noise(self):
@@ -87,7 +90,13 @@ class GradientAgent(Agent):
 
     def _get_gradient(self, field) -> np.ndarray:
         # coordinate grads are grouped into the first axis through 'np.stack'
-        return np.stack(np.gradient(field))
+        grad = np.stack(np.gradient(field))
+        if self._normalized:
+            w, h = self._field_size
+            # sklearn normalize works only with 2d arrays, that's why reshape
+            flat_grad = grad.reshape((2, w * h))
+            grad = normalize(flat_grad, axis=0, norm='l2').reshape((2, w, h))
+        return grad
 
     def forward(self, obs: ObsType) -> ActType:
         coords = ['dx', 'dy']
