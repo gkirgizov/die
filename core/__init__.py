@@ -32,31 +32,42 @@ Necessary core
         - [x] agents feed & consume
     Bugs
     - [x] sort out why agents are ...lost?...
-    - [ ] only alive selection -- is it working?
-    - [ ] BUG with agents feeding somehow unconstrained growth from where? from collisions?
+    - [x] only alive selection -- is it working?
+    - [x] BUG with agents feeding somehow unconstrained growth from where? from collisions?
           what can it be? possibly it's data collisions in 'feeding' step.
           try rewriting it step-by-step
 
 - [x] plotting agents array with food etc.
 - [x] plotting LIVE
-- [ ] medium food dynamics -- const | random add
-- [x] agent action cost -- not obvious & important
 
+- [x] agent action cost -- not obvious & important
 - [x] some boundary conditions
 - [x] medium diffusion & decay
+- [ ] medium food dynamics -- const | random add
 - [ ] 0.2: come up with Physarum kernel
       some summing-up kernel that determines direction?
       like *chemical-weighted sum of coordinates*? then we get direction vector.
       ah, I see! that's like *a specific case of general convolving agent* with const-linear weigth mask!
       - [ ] understand why gradient agent doesn't return the characteristic pattern of physarum?
-            ?add some inertia coefficient
+            - [x] add some inertia coefficient
+            - [x] try adding noise
+                  -- it doesn't change a lot; but be careful with a scale.
+                  Clusters still form, but bigger
+            - [ ] try direction-only (normalized) gradient
+            a) inertia on gradient directly ~= inertia on direction
             ?or possibly add requirement for *continuity* of the *derivative* (1st or 2nd order)
+        - [ ] understand how coagulation works, how it depends on:
+            - number of agentes
+            - agent speed
+            - env character
       - [ ] reproduce physarum environment with basics (no food, just inertia)
       - [ ] add some *native* collision resolution -- natural stochasticity of agents
 
       - [ ] setup clear Reward & performance characteristics (allmost done)
       - [ ] setup baseline Dynamics hyperparams
             criteria is some baseline performance of Random agent
+- [ ] add init agents irrespective of medium (i.e. bigger number)
+- [ ] add
 
 -- does that count as a paper on generalisation of original Physarum paper? making it continuous?
    how about Lenia?

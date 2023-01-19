@@ -66,8 +66,7 @@ class Env(gym.Env[ObsType, ActType]):
         self.coordgrid = utils.get_meshgrid(field_size)
         # self.coordsteps = np.abs(self.coordgrid[:, 1] - self.coordgrid[:, 0])
 
-        self.dynamics = dynamics or Dynamics(rate_feed=0.1,
-                                             rate_decay_chem=0.001)
+        self.dynamics = dynamics or Dynamics()
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_food_perlin(threshold=1.0) \
