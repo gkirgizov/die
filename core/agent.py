@@ -3,6 +3,7 @@ from functools import lru_cache
 from typing import Optional, Union, List, Tuple, TypeVar, Callable, Sequence
 
 import numpy as np
+import scipy
 from sklearn.preprocessing import normalize
 import xarray as da
 import gymnasium as gym
@@ -93,15 +94,12 @@ class GradientAgent(Agent):
     def _get_gradient(self, field) -> np.ndarray:
         # coordinate grads are grouped into the first axis through 'np.stack'
         grad = np.stack(np.gradient(field))
+        norm = scipy.linalg.norm(grad, axis=0, ord=2)
         if self._normalized:
-            w, h = self._field_size
-            # sklearn normalize works only with 2d arrays, that's why reshape
-            flat_grad = grad.reshape((2, w * h))
-            flat_grad, norms = normalize(flat_grad, axis=0, norm='l2', return_norm=True)
+            grad = np.nan_to_num(grad / norm)
+        if True:
             # Apply mask for too small gradients
-            flat_grad *= (norms >= self._grad_clip)
-            # Reshape to original form
-            grad = flat_grad.reshape((2, w, h))
+            grad *= (norm >= self._grad_clip)
         return grad
 
     def forward(self, obs: ObsType) -> ActType:
