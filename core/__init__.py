@@ -3,7 +3,7 @@
 Plan
 - [x] Stage 0.1: const moving
 - [ ] Stage 0.2: classic physarum? without feeding/dying; just moving
-- [ ] Stage 0.3: basic intelligance: some obviously working learning agent (e.g. evolutionary)
+- [ ] Stage 0.3: basic intelligence: some obviously working learning agent (e.g. evolutionary)
 -- can write an article here; publish as a new Env for ALife research
 - [ ] Stage 0.4: RL
 - [ ] Stage 0.5: FEP
@@ -47,28 +47,41 @@ Necessary core
       some summing-up kernel that determines direction?
       like *chemical-weighted sum of coordinates*? then we get direction vector.
       ah, I see! that's like *a specific case of general convolving agent* with const-linear weigth mask!
-      - [ ] understand why gradient agent doesn't return the characteristic pattern of physarum?
+      - [x] understand why gradient agent doesn't return the characteristic pattern of physarum?
             - [x] add some inertia coefficient
             - [x] try adding noise
                   -- it doesn't change a lot; but be careful with a scale.
                   Clusters still form, but bigger
-            - [ ] try direction-only (normalized) gradient
-            a) inertia on gradient directly ~= inertia on direction
-            ?or possibly add requirement for *continuity* of the *derivative* (1st or 2nd order)
-        - [ ] experiment 1 on medium food dynamics -- const | random add
-            give agents an aim for movement
-        - [ ] understand how coagulation works, how it depends on:
-            - number of agents
-            - agent speed
-            - env character
+            - [x] try direction-only (normalized) gradient
+            (a) inertia on gradient directly ~= inertia on direction
+            (b) or possibly add requirement for *continuity* of the *derivative* (1st or 2nd order)
+
+            Experiment results on gradient agent:
+            -> gradient scale + noise don't work for physarum because
+            (a) noise forgets direction inertia (so cells don't tend to follow their routes)
+            (b) gradient scale is still gradient-dependent, so coagulation is still there
+            So, overall gradient strategy is like conservative exploitation strategy.
+            It depends on ratio of environment decay/diffuse and agent deposit.
+
+            -> [ ] and it can be learnt!
+
+      - [x] experiment 1 on medium food dynamics -- const | random add
+          give agents an aim for movement
+          --> obviously with gradient they try repeating the moving pattern.
+      - [x] understand how coagulation works, how it depends on:
+          - number of agents
+          - agent speed
+          - env character
+          --> see results below on living thing 1
       - [ ] reproduce physarum environment with basics (no food, just inertia)
+            Need make agents:
+            - always moving
+            - always turning by specific amount (gradient inertia doesn't work)
       - [ ] add some *native* collision resolution -- natural stochasticity of agents
 
       - [ ] setup clear Reward & performance characteristics (allmost done)
       - [ ] setup baseline Dynamics hyperparams
             criteria is some baseline performance of Random agent
-- [ ] add init agents irrespective of medium (i.e. bigger number)
-- [ ] add
 
 -- does that count as a paper on generalisation of original Physarum paper? making it continuous?
    how about Lenia?
@@ -99,7 +112,7 @@ tests
 
 ----------
 
-Living thing 1:
+Living thing 1 (Gradient coagulating agent):
 - scale controls characteristic size of "cells"
 - inertia controls their "responsiveness" and how fast they change/move/merge
 - they are stable and not-moving in absence of nearby agents

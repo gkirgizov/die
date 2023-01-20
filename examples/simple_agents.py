@@ -16,9 +16,10 @@ def try_agent_action(agent: Agent,
                      ):
     food_flow = \
         WaveSequence(field_size, dt=0.01).get_flow_operator(scale=0.5, decay=1)
-    env = Env(field_size, Dynamics(init_agent_ratio=0.2,
+    env = Env(field_size, Dynamics(init_agent_ratio=0.35,
                                    op_food_flow=food_flow,
                                    food_infinite=False,
+                                   # food_infinite=True,
                                    ))
 
     def manual_step(action: ActType):
@@ -63,8 +64,8 @@ def try_random_agent(**kwargs):
 
 def try_gradient_agent(field_size, **kwargs):
     agent = GradientAgent(field_size,
-                          inertia=0.9, scale=.15, deposit=0.005,
-                          kind='gaussian_noise', noise_scale=0.01,
+                          inertia=0.98, scale=0.1, deposit=5,
+                          kind='gaussian_noise', noise_scale=0.001,
                           normalized_grad=True)
     try_agent_action(agent, field_size=field_size, **kwargs)
 
