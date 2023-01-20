@@ -69,6 +69,7 @@ class GradientAgent(Agent):
                  kind: str = 'gaussian_noise',
                  noise_scale: float = 0.025,
                  normalized_grad: bool = False,
+                 grad_clip: float = 1e-5,
                  ):
         if kind not in self.kinds:
             raise ValueError(f'Unknown kind of agent {kind}')
@@ -80,6 +81,7 @@ class GradientAgent(Agent):
         self._deposit = deposit
         self._inertia = inertia
         self._normalized = normalized_grad
+        self._grad_clip = grad_clip
         self._prev_grad = self._get_some_noise()
 
     def _get_some_noise(self):
@@ -95,7 +97,11 @@ class GradientAgent(Agent):
             w, h = self._field_size
             # sklearn normalize works only with 2d arrays, that's why reshape
             flat_grad = grad.reshape((2, w * h))
-            grad = normalize(flat_grad, axis=0, norm='l2').reshape((2, w, h))
+            flat_grad, norms = normalize(flat_grad, axis=0, norm='l2', return_norm=True)
+            # Apply mask for too small gradients
+            flat_grad *= (norms >= self._grad_clip)
+            # Reshape to original form
+            grad = flat_grad.reshape((2, w, h))
         return grad
 
     def forward(self, obs: ObsType) -> ActType:
