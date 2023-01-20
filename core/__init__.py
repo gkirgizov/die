@@ -43,7 +43,6 @@ Necessary core
 - [x] agent action cost -- not obvious & important
 - [x] some boundary conditions
 - [x] medium diffusion & decay
-- [ ] medium food dynamics -- const | random add
 - [ ] 0.2: come up with Physarum kernel
       some summing-up kernel that determines direction?
       like *chemical-weighted sum of coordinates*? then we get direction vector.
@@ -56,8 +55,10 @@ Necessary core
             - [ ] try direction-only (normalized) gradient
             a) inertia on gradient directly ~= inertia on direction
             ?or possibly add requirement for *continuity* of the *derivative* (1st or 2nd order)
+        - [ ] experiment 1 on medium food dynamics -- const | random add
+            give agents an aim for movement
         - [ ] understand how coagulation works, how it depends on:
-            - number of agentes
+            - number of agents
             - agent speed
             - env character
       - [ ] reproduce physarum environment with basics (no food, just inertia)
@@ -96,6 +97,14 @@ Well packaged
 tests
 - [ ] make test for double-way mapping agents --> medium and back
 
+----------
 
+Living thing 1:
+- scale controls characteristic size of "cells"
+- inertia controls their "responsiveness" and how fast they change/move/merge
+- they are stable and not-moving in absence of nearby agents
+- sometimes can get almost pure stable rings of characteristic size (inertia was 0.9)
+- at inertia 0.2 get more dynamic form change: got several metamorphoses
+  from metastable smooth "triangle" circles to several embedded circles.
 
 """

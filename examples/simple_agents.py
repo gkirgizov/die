@@ -13,7 +13,7 @@ def try_agent_action(agent: Agent,
                      iters=1000,
                      show_each=1,
                      ):
-    env = Env(field_size, Dynamics(init_agent_ratio=0.25,
+    env = Env(field_size, Dynamics(init_agent_ratio=0.2,
                                    food_infinite=True,
                                    ))
 
@@ -59,16 +59,18 @@ def try_random_agent(**kwargs):
 
 def try_gradient_agent(field_size, **kwargs):
     agent = GradientAgent(field_size,
-                          inertia=0., scale=5.0, deposit=0.005,
-                          kind='gaussian_noise', noise_scale=0.001)
+                          inertia=0., scale=.15, deposit=0.005,
+                          kind='gaussian_noise', noise_scale=0.0,
+                          normalized_grad=True)
     try_agent_action(agent, field_size=field_size, **kwargs)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    field_size = (256, 256)
-    # field_size = (128, 128)
+    # field_size = (512, 512)
+    # field_size = (256, 256)
+    field_size = (196, 196)
     # field_size = (94, 94)
     # field_size = (32, 32)
     # try_const_agent(field_size=field_size)
