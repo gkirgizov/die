@@ -69,8 +69,7 @@ class Env(gym.Env[ObsType, ActType]):
         self.dynamics = dynamics or Dynamics()
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
-            .with_food_perlin(threshold=1.0) \
-            .with_const('env_food', 0.5) \
+            .with_food_perlin(threshold=1.0, octaves=4) \
             .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
 
@@ -181,8 +180,6 @@ class Env(gym.Env[ObsType, ActType]):
         # Simpler logic relying on automatic coordinate alignment; untested
         # agent_coords_new = self._agent_move_handle_boundary(self.agents + agent_actions)
         # self.agents.loc[dict(channel=coord_chans)] = agent_coords_new
-
-        # TODO: maybe deposit at this same step? other actions, no?
 
     def _iter_agents(self, shuffle: bool = True) -> Sequence[Tuple[int, int]]:
         xs, ys = self._get_agent_indices

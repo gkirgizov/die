@@ -1,14 +1,92 @@
+from itertools import cycle
 from numbers import Number
 from numbers import Number
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Iterable
 from typing import Union, Sequence, Hashable
 
 import numpy as np
 import xarray as da
 from perlin_noise import PerlinNoise
 
-from core.base_types import Channels, DataChannels, ObsType, ActType, MediumType, AgtType
+from core import utils
+from core.base_types import Channels, DataChannels, ObsType, ActType, MediumType, AgtType, FoodOperator
 from core.utils import get_agents_by_medium
+
+
+class FieldSequence(Sequence[np.ndarray]):
+    def __init__(self,
+                 field_size: Sequence[int],
+                 dt: float = 0.01,
+                 t_bounds: Tuple[float, float] = (0, 10),
+                 ):
+        self._size = field_size
+        self._tbounds = t_bounds
+        self._grid = utils.get_meshgrid(field_size)
+        self._xs = np.linspace(0, 1, self._size[0])
+        self._ys = np.linspace(0, 1, self._size[1])
+        self._ts = np.arange(*t_bounds, dt)
+
+    def get_flow_operator(self,
+                          scale: float = 1.0,
+                          decay: float = 0.0,
+                          ) -> FoodOperator:
+        it = iter(self)
+
+        def food_flow(current):
+            return scale * next(it) + (1 - decay) * current
+
+        return food_flow
+
+    def __iter__(self):
+        for t in cycle(self._ts):
+            yield self[t]
+
+    def __len__(self):
+        return len(self._ts)
+
+    def __contains__(self, t: float):
+        t0, t_end = self._tbounds
+        return t0 <= t < t_end
+
+    def __getitem__(self, t: float) -> np.ndarray:
+        raise NotImplementedError
+
+
+class PerlinNoiseSequence(FieldSequence):
+    def __init__(self,
+                 field_size: Sequence[int],
+                 dt: float = 0.01,
+                 t_bounds: Tuple[float, float] = (0, 1),
+                 octaves: int = 8):
+        super().__init__(field_size, dt, t_bounds)
+        self._noise = PerlinNoise(octaves=octaves)
+
+    def __getitem__(self, t: float) -> np.ndarray:
+        return np.array([[self._noise((x, y, t))
+                          for y in self._ys]
+                         for x in self._xs]
+                        ).round(3)
+
+
+class WaveSequence(FieldSequence):
+    def __getitem__(self, t: float) -> np.ndarray:
+        # Waves running
+        pi = np.pi
+        x, y = (self._grid - 0.5) * 2  # normalized to [-1, 1]
+        r = np.linalg.norm((x, y), axis=0)
+        rwave = r + np.cos(pi * x) + np.sin(0.4 * pi * y)
+        z_waves = np.cos(1 * pi * (rwave + t))
+
+        # Islands moving
+        sx, sy = 3, 3
+        z_islands = (np.sin(pi * x * sx + t) + np.cos(pi * y * sy + t))
+
+        # Make a mixture of both
+        mix = 0.25
+        z = (1 - mix) * z_waves + mix * z_islands  # v1
+        # z = z_waves * z_islands  # v2
+
+        return z
 
 
 class DataInitializer:
@@ -129,8 +207,8 @@ class DataInitializer:
         # self._channels['agent_food'] = agents * self._get_random(0.1, 0.2)
         return self
 
-    def with_food_perlin(self, threshold: float = 0.25):
-        self._channels['env_food'] = self._mask(self._get_perlin(),
+    def with_food_perlin(self, threshold: float = 0.25, octaves: int = 8):
+        self._channels['env_food'] = self._mask(self._get_perlin(octaves=octaves),
                                                 mask_above=threshold)
         return self
 
