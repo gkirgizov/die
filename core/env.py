@@ -15,7 +15,7 @@ from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperat
     Array1C
 from core.data_init import DataInitializer
 from core import utils
-from core.utils import EnvDrawer
+from core.plotting import EnvDrawer
 
 RenderFrame = TypeVar('RenderFrame')
 

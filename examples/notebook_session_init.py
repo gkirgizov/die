@@ -7,7 +7,7 @@ from core.base_types import ActType, ObsType, MaskType, CostOperator, DataChanne
 from core.data_init import DataInitializer
 from core.env import Env
 from core.agent import Agent
-from core.utils import EnvDrawer
+from core.plotting import EnvDrawer
 
 
 def get_test_fields(field_size, agents_ratio=0.2):
