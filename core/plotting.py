@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional, Callable
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -34,7 +34,7 @@ class EnvDrawer:
                  size: float = 8,
                  aspect: float = 1.0,
                  with_grid_agents=False,
-                 with_agent_trace=False):
+                 color_mapper: Optional[Callable] = None):
         # Setup figure with subplots
         figheight = size
         figwidth = size * aspect
@@ -42,6 +42,7 @@ class EnvDrawer:
         self.fig, axs = plt.subplots(nrows=2, ncols=2, figsize=figsize,
                                      gridspec_kw={'width_ratios': [1, 1],
                                                   'height_ratios': [1, 1]})
+        self._rgb_mapper = color_mapper or (lambda rgba: rgba)
 
         self.field_size = field_size
         (medium_ax, trace_ax), (agent_ax, spare_ax) = axs
@@ -81,23 +82,27 @@ class EnvDrawer:
 
     def _upd_img_dummy(self, *args) -> np.ndarray:
         width, height = self.field_size
-        return np.ones((height, width, 3))
+        return np.ones((height, width, 4))
 
     def _upd_img_medium(self, medium: MediumType, agents: AgtType) -> np.ndarray:
         """Returns RGB/RGBA image ready for imshow"""
-        # Setup medium plot
-        medium_data = medium.sel(channel=['agents', 'env_food', 'chem1'])
-        # transpose dimensions so that channes dim would be the last
-        medium_data_rgb = medium_data.values.transpose((1, 2, 0))
+        # transpose dimensions so that channels dim would be the last
+        ones_channel = np.ones(self.img_shape)
+        medium_data_rgb = np.stack([medium.sel(channel='agents'),
+                                    medium.sel(channel='env_food'),
+                                    medium.sel(channel='chem1'),
+                                    ], axis=-1)
+        medium_data_rgb = self._rgb_mapper(medium_data_rgb)
         return medium_data_rgb
 
     def _upd_img_trace(self, medium: MediumType, agents: AgtType) -> np.ndarray:
         self._agent_trace.update(medium.sel(channel='agents'))
         trace_channel = self._agent_trace.as_mask()
-        zero_channel = np.zeros(self.img_shape)
+        ones_channel = np.ones(self.img_shape)
         data_rgb = np.stack([trace_channel,
                              trace_channel,
                              trace_channel,
+                             ones_channel,
                              ], axis=-1)
         return data_rgb
 

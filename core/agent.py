@@ -71,7 +71,7 @@ class GradientAgent(Agent):
                  kind: str = 'gaussian_noise',
                  noise_scale: float = 0.025,
                  normalized_grad: bool = True,
-                 grad_clip: float = 1e-5,
+                 grad_clip: Optional[float] = 1e-5,
                  ):
         if kind not in self.kinds:
             raise ValueError(f'Unknown kind of agent {kind}')
@@ -98,7 +98,7 @@ class GradientAgent(Agent):
         norm = scipy.linalg.norm(grad, axis=0, ord=2)
         if self._normalized:
             grad = np.nan_to_num(grad / norm)
-        if True:
+        if self._grad_clip is not None:
             # Apply mask for too small gradients
             grad *= (norm >= self._grad_clip)
         return grad
@@ -150,8 +150,7 @@ class PhysarumAgent(GradientAgent):
                  kind: str = 'gaussian_noise',
                  noise_scale: float = 0.025,
                  normalized_grad: bool = True,
-                 grad_clip: float = 1e-5,
-
+                 grad_clip: Optional[float] = 1e-5,
                  turn_angle: int = 30,
                  ):
         super().__init__(field_size,

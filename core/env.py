@@ -5,8 +5,6 @@ from numbers import Number
 from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable, Dict
 
 import numpy as np
-# from scipy.signal import fftconvolve as convolve
-import skimage
 from skimage import filters
 import xarray as da
 import gymnasium as gym
@@ -66,8 +64,8 @@ class Env(gym.Env[ObsType, ActType]):
         self.dynamics = dynamics or Dynamics()
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
-            .with_const('env_food', 0.5) \
             .with_food_perlin(threshold=1.0, octaves=4) \
+            .with_const('env_food', 0.5) \
             .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
 
@@ -75,7 +73,14 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.buffer_medium = self.medium.copy(deep=True)
 
-        self._drawer = EnvDrawer(field_size, size=6, aspect=self._get_aspect_ratio)
+        color = [0.19, -0.3, 0.74]
+        color = [-0.45, 0.65, 0.83]
+        # color = (np.random.random(3) - 0.5) * 2
+        # print(color)
+        color /= np.linalg.norm(color)
+        self._drawer = EnvDrawer(field_size, size=6, aspect=self._get_aspect_ratio,
+                                 color_mapper=lambda rgb: np.cross(color, rgb, axisb=-1)
+                                 )
         self._drawer.show(self.medium, self.agents)  # initial show
 
     def _rotate_agent_buffer(self, reset_data=0.):
