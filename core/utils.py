@@ -164,3 +164,20 @@ def get_agents_by_medium(medium: MediumType) -> np.ndarray:
     coord_chans = np.array([np.array(sel_medium[c]) for c in coord_chans])
 
     return coord_chans
+
+
+def polar2z(r, theta):
+    return r * np.exp(np.multiply(1j, theta))
+
+
+def z2polar(z):
+    return abs(z), np.angle(z)
+
+
+def polar2xy(r, theta):
+    z = polar2z(r, theta)
+    return np.real(z), np.imag(z)
+
+
+def xy2polar(x, y):
+    return z2polar(x + np.multiply(1j, y))
