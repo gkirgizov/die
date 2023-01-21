@@ -182,6 +182,8 @@ class PhysarumAgent(GradientAgent):
         drads = self._discretize_turn(drads)
 
         # Convert back from radians to (dx, dy)
+        # TODO: maybe clipping gradient in get_gradient precludes
+        #  constant movemvent and finer normalization
         dr = 1. if self._normalized else dr
         grad = np.stack(polar2xy(dr, drads))
 

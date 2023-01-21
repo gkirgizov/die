@@ -3,7 +3,7 @@ import logging
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from core.agent import ConstAgent, Agent, RandomAgent, GradientAgent
+from core.agent import ConstAgent, Agent, RandomAgent, GradientAgent, PhysarumAgent
 from core.base_types import ActType
 from core.data_init import WaveSequence
 from core.env import Env, Dynamics
@@ -15,8 +15,8 @@ def try_agent_action(agent: Agent,
                      show_each=1,
                      ):
     food_flow = \
-        WaveSequence(field_size, dt=0.01).get_flow_operator(scale=0.5, decay=1)
-    env = Env(field_size, Dynamics(init_agent_ratio=0.35,
+        WaveSequence(field_size, dt=0.01).get_flow_operator(scale=0.8, decay=1)
+    env = Env(field_size, Dynamics(init_agent_ratio=0.25,
                                    op_food_flow=food_flow,
                                    food_infinite=False,
                                    # food_infinite=True,
@@ -54,12 +54,12 @@ def try_agent_action(agent: Agent,
 
 def try_const_agent(**kwargs):
     agent = ConstAgent(delta_xy=(-0.01, 0.005), deposit=0.1)
-    try_agent_action(agent, **kwargs)
+    return agent
 
 
 def try_random_agent(**kwargs):
     agent = RandomAgent(move_scale=0.01, deposit_scale=0.1)
-    try_agent_action(agent, **kwargs)
+    return agent
 
 
 def try_gradient_agent(field_size, **kwargs):
@@ -67,7 +67,16 @@ def try_gradient_agent(field_size, **kwargs):
                           inertia=0.98, scale=0.1, deposit=5,
                           kind='gaussian_noise', noise_scale=0.001,
                           normalized_grad=True)
-    try_agent_action(agent, field_size=field_size, **kwargs)
+    return agent
+
+
+def try_physarum_agent(field_size, **kwargs):
+    agent = PhysarumAgent(field_size,
+                          turn_angle=43,
+                          inertia=0.0, scale=0.005, deposit=4,
+                          noise_scale=0.001,
+                          normalized_grad=True)
+    return agent
 
 
 if __name__ == '__main__':
@@ -75,10 +84,14 @@ if __name__ == '__main__':
 
     # field_size = (512, 512)
     # field_size = (256, 256)
-    field_size = (196, 196)
+    field_size = (156, 156)
     # field_size = (94, 94)
     # field_size = (32, 32)
-    # try_const_agent(field_size=field_size)
-    # try_random_agent(field_size=field_size)
-    try_gradient_agent(field_size=field_size)
+
+    # agent = try_const_agent()
+    # agent = try_random_agent()
+    # agent = try_gradient_agent(field_size=field_size)
+    agent = try_physarum_agent(field_size=field_size)
+
+    try_agent_action(agent, field_size, iters=1000)
 
