@@ -176,6 +176,7 @@ class Env(gym.Env[ObsType, ActType]):
         # Compute new positions, don't forget about boundary conditions
         agent_coords = self.agents.sel(channel=coord_chans).to_numpy()
         delta_coords = agent_actions.sel(channel=delta_chans).to_numpy()
+        # TODO: all above will be simplified when Action will be like Agent array, nor Field
         agent_coords_new = self._agent_move_handle_boundary(agent_coords + delta_coords)
         # Update agent coordinates
         self.agents.loc[dict(channel=coord_chans)] = agent_coords_new

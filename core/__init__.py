@@ -43,6 +43,16 @@ Necessary core
 - [x] agent action cost -- not obvious & important
 - [x] some boundary conditions
 - [x] medium diffusion & decay
+- [ ] rewrite Agents to work on 'agents' array with FieldMapping
+        because now i can't store direction of agents fixed by agent id
+        --> seems like it's simpler to just select gradient field and act on agents array.
+        that is: change Action format from Field to Agent -> it's far more logical
+        possibly this will simplify Env logic
+        - [ ] agent_move
+        seems like will need single mapping from Action array to Medium by Agent coords
+        - [ ] agent_act_on_medium will be like agents_to_medium
+    - [ ] add medium RANDOMIZATION of agents <-- will be resolved by previous point
+          because randomization in agents is still liable to *aliasing*
 - [ ] 0.2: come up with Physarum kernel
       some summing-up kernel that determines direction?
       like *chemical-weighted sum of coordinates*? then we get direction vector.
@@ -74,6 +84,16 @@ Necessary core
           - env character
           --> see results below on living thing 1
       - [ ] reproduce physarum environment with basics (no food, just inertia)
+            algo
+            - init random directin with some discretization
+            - extract angle from gradient value (i.e. xy direction to radians)
+            - compute diff with previous direction (modulo 180):
+                - if it's > 0 then turn right (by fixed angle)
+                - if it's < 0 then turn left (by fixed angle)
+                - if it's close to zero --> random turn
+            - remember new direction value
+            differences:
+            - sense neighbourhooud is immediate not further
             Need make agents:
             - always moving
             - always turning by specific amount (gradient inertia doesn't work)
