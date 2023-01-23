@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from functools import lru_cache
 from typing import Optional, Union, List, Tuple, TypeVar, Callable, Sequence
 
@@ -11,7 +12,7 @@ import gymnasium as gym
 from core import utils
 from core.base_types import ActType, ObsType, MaskType, AgtType, MediumType
 from core.data_init import DataInitializer
-from core.utils import z2polar, polar2z, xy2polar, polar2xy
+from core.utils import z2polar, polar2z, xy2polar, polar2xy, renormalize_radians, discretize
 
 
 class Agent(ABC):
@@ -88,8 +89,8 @@ class GradientAgent(Agent):
 
     def _get_some_noise(self):
         ncoords = 2
-        noise = self._noise_scale * self._rng.normal(loc=0., scale=0.4,
-                                                     size=(ncoords, *self._field_size))
+        noise = self._rng.normal(loc=0., scale=0.4,
+                                 size=(ncoords, *self._field_size))
         return noise
 
     def _get_gradient(self, field) -> np.ndarray:
@@ -113,7 +114,7 @@ class GradientAgent(Agent):
         grad = (1 - self._inertia) * grad + self._inertia * self._prev_grad
         # Compute final value with noise
         noise = self._get_some_noise() if self._kind == 'gaussian_noise' else 0
-        grad += noise
+        grad += self._noise_scale * noise
         # Store grad for the next computation
         self._prev_grad = grad
         return grad
@@ -144,7 +145,7 @@ class GradientAgent(Agent):
 class PhysarumAgent(GradientAgent):
     def __init__(self,
                  field_size: Tuple[int, int],
-                 scale: float = 1.0,
+                 scale: float = 0.01,
                  deposit: float = 0.1,
                  inertia: float = 0.5,
                  kind: str = 'gaussian_noise',
@@ -159,37 +160,48 @@ class PhysarumAgent(GradientAgent):
                          normalized_grad, grad_clip)
         self._turn_radians = np.radians(turn_angle)
         self._rtol = 1e-2   # relative tolerance to turn angle
-        self._prev_grad = self._discretize_gradient(self._prev_grad)
+        # self._prev_grad = self._discretize_gradient(self._prev_grad, mix=False)
+        # TODO: make it really discrete and not just +-turn
+        self._direction_rads = self._get_random_direction()
 
-    def _discretize_turn(self, drads: np.ndarray) -> np.ndarray:
+    def _get_random_direction(self):
+        x, y = self._prev_grad
+        _, rads = xy2polar(x, y)
+        rads = discretize(rads, self._turn_radians)
+        return rads
+
+    def _discretize_turn(self, dir_delta: np.ndarray) -> np.ndarray:
         atol = self._turn_radians * self._rtol
         # Random turn for indeterminate gradients
-        undetermined = np.isclose(0, drads, rtol=1e-2, atol=atol)
-        random_turn = self._turn_radians * (np.random.randint(0, 2, undetermined.shape) - 0.5) * 2
-        # Turn right or left or randomly
-        drads[undetermined] = random_turn[undetermined]
-        drads[drads > atol] = self._turn_radians
-        drads[drads < -atol] = -self._turn_radians
-        return drads
+        undetermined = np.isclose(0, dir_delta, rtol=1e-2, atol=atol)
+        turn = self._turn_radians * (np.random.randint(0, 2, undetermined.shape) - 0.5) * 2
+        # Turn right or left, except for undetermined values where random turn is made
+        turn[dir_delta > atol] = self._turn_radians  # right
+        turn[dir_delta < -atol] = -self._turn_radians  # left
+        return turn
 
     def _discretize_gradient(self, grad: np.ndarray) -> np.ndarray:
         # Convert dx, dy to radians
         dx, dy = grad
         dr, drads = xy2polar(dx, dy)  # radian values are already normalized in (-pi, pi]
 
+        # Compute delta between actual direction & chemical gradient direction
+        dir_delta = self._direction_rads - drads
         # Make discrete movement choice
-        drads = self._discretize_turn(drads)
+        turn_radians = self._discretize_turn(dir_delta)
+        # Compute full direction:
+        self._direction_rads = renormalize_radians(turn_radians + self._direction_rads)
 
         # Convert back from radians to (dx, dy)
         # TODO: maybe clipping gradient in get_gradient precludes
         #  constant movemvent and finer normalization
         dr = 1. if self._normalized else dr
-        grad = np.stack(polar2xy(dr, drads))
-
+        grad = np.stack(polar2xy(dr, self._direction_rads))
         return grad
 
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
-        return self._discretize_gradient(grad)
+        delta_grad = self._discretize_gradient(grad)
+        return delta_grad
 
 
 class ConstAgent(Agent):
