@@ -163,6 +163,8 @@ class PhysarumAgent(GradientAgent):
         # self._prev_grad = self._discretize_gradient(self._prev_grad, mix=False)
         # TODO: make it really discrete and not just +-turn
         self._direction_rads = self._get_random_direction()
+        self._const_dir = self._get_random_direction()
+        self._const_grad = deepcopy(self._prev_grad)
 
     def _get_random_direction(self):
         x, y = self._prev_grad
@@ -200,8 +202,10 @@ class PhysarumAgent(GradientAgent):
         return grad
 
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
-        delta_grad = self._discretize_gradient(grad)
-        return delta_grad
+        return self._const_grad * 10
+        # return np.stack(polar2xy(1., self._const_dir))
+        # delta_grad = self._discretize_gradient(grad)
+        # return delta_grad
 
 
 class ConstAgent(Agent):

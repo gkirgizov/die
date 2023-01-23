@@ -16,10 +16,10 @@ def try_agent_action(agent: Agent,
                      ):
     food_flow = \
         WaveSequence(field_size, dt=0.01).get_flow_operator(scale=0.8, decay=1)
-    env = Env(field_size, Dynamics(init_agent_ratio=0.25,
-                                   op_food_flow=food_flow,
-                                   food_infinite=False,
-                                   # food_infinite=True,
+    env = Env(field_size, Dynamics(init_agent_ratio=0.01,
+                                   # op_food_flow=food_flow,
+                                   # food_infinite=False,
+                                   food_infinite=True,
                                    ))
 
     def manual_step(action: ActType):
@@ -72,9 +72,9 @@ def try_gradient_agent(field_size, **kwargs):
 
 def try_physarum_agent(field_size, **kwargs):
     agent = PhysarumAgent(field_size,
-                          turn_angle=43,
+                          turn_angle=33,
                           inertia=0.0, scale=0.005, deposit=4,
-                          noise_scale=0.001,
+                          noise_scale=0.00,
                           normalized_grad=True)
     return agent
 
@@ -84,8 +84,8 @@ if __name__ == '__main__':
 
     # field_size = (512, 512)
     # field_size = (256, 256)
-    field_size = (156, 156)
-    # field_size = (94, 94)
+    # field_size = (156, 156)
+    field_size = (94, 94)
     # field_size = (32, 32)
 
     # agent = try_const_agent()
