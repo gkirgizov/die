@@ -122,7 +122,7 @@ class GradientAgent(Agent):
     def forward(self, obs: ObsType) -> ActType:
         coords = ['dx', 'dy']
         agents, medium = obs
-        action = DataInitializer.init_action_for(medium)
+        action = DataInitializer.init_action_for(agents)
         chemical = medium.sel(channel='chem1')
 
         # Compute chemical gradient with custom processing
@@ -213,7 +213,7 @@ class ConstAgent(Agent):
         agents, medium = obs
 
         # at each agent location write our const vector
-        action = DataInitializer.init_action_for(medium)
+        action = DataInitializer.init_action_for(agents)
         for chan in action.coords['channel'].values:
             action.loc[dict(channel=chan)] = self._data[chan]
 
@@ -230,7 +230,7 @@ class RandomAgent(Agent):
         agents, medium = obs
 
         s = self._scale
-        action = DataInitializer.action_for(medium) \
+        action = DataInitializer.action_for(agents) \
             .with_noise('dx', -s, s) \
             .with_noise('dy', -s, s) \
             .with_noise('deposit1', 0., self._dep_scale) \

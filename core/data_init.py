@@ -112,6 +112,24 @@ class DataInitializer:
         return medium
 
     @staticmethod
+    def init_agential_array(num_agents: int,
+                            channels: Sequence[Hashable],
+                            name: Optional[str] = None,
+                            init_data: Optional[Union[Number, np.ndarray]] = None) -> da.DataArray:
+        """Creates flat int-indexed array"""
+        index = np.arange(0, num_agents)
+        if init_data is None:
+            init_data = 0
+
+        channel_array = da.DataArray(
+            data=init_data,
+            dims=['channel', 'index'],
+            coords={'channel': list(channels), 'index': index},
+            name=name,
+        )
+        return channel_array
+
+    @staticmethod
     def agents_from_medium(medium: MediumType, max_agents=None, food_ratio=1.0) -> AgtType:
         channels: Sequence[Hashable] = DataChannels.agents
         name: str = 'agents'
@@ -128,24 +146,19 @@ class DataInitializer:
         all_init_data = np.zeros(shape)
         all_init_data[:, :num_agents_alive] = init_data
 
-        agents = da.DataArray(
-            data=all_init_data,
-            dims=['channel', 'index'],
-            coords={'channel': list(channels)},
-            name=name,
-        )
+        agents = DataInitializer.init_agential_array(max_agents, channels, name, all_init_data)
         return agents
 
     @staticmethod
-    def init_action_for(medium: MediumType, init_data=0.) -> ActType:
-        return DataInitializer.init_field_array(field_size=medium.shape[1:],
-                                                channels=DataChannels.actions,
-                                                name='actions',
-                                                init_data=init_data)
+    def init_action_for(agents: AgtType, init_data=0.) -> ActType:
+        return DataInitializer.init_agential_array(num_agents=agents.shape[-1],
+                                                   channels=DataChannels.actions,
+                                                   name='actions',
+                                                   init_data=init_data)
 
     @staticmethod
-    def action_for(medium: MediumType) -> 'DataInitializer':
-        return DataInitializer(field_size=medium.shape[1:],
+    def action_for(agents: AgtType) -> 'DataInitializer':
+        return DataInitializer(field_size=agents.shape[-1],
                                channels=DataChannels.actions,
                                name='actions')
 
@@ -171,6 +184,7 @@ class DataInitializer:
         return self.get_random(self._size, a, b)
 
     def _get_perlin(self, octaves: int = 8) -> np.ndarray:
+        # TODO: abstract for any dim
         noise = PerlinNoise(octaves=octaves)
         xs = np.linspace(0, 1, self._size[0])
         ys = np.linspace(0, 1, self._size[1])
