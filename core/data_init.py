@@ -240,3 +240,10 @@ class DataInitializer:
                                                 channels=self._channels,
                                                 name=name,
                                                 init_data=data)
+
+    def build_agents(self, name: Optional[str] = None) -> MediumType:
+        data = self.build_numpy()
+        return DataInitializer.init_agential_array(num_agents=self._size,
+                                                   channels=self._channels,
+                                                   name=name,
+                                                   init_data=data)

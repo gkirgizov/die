@@ -16,7 +16,7 @@ def try_agent_action(agent: Agent,
                      ):
     food_flow = \
         WaveSequence(field_size, dt=0.01).get_flow_operator(scale=0.8, decay=1)
-    env = Env(field_size, Dynamics(init_agent_ratio=0.01,
+    env = Env(field_size, Dynamics(init_agent_ratio=0.15,
                                    # op_food_flow=food_flow,
                                    # food_infinite=False,
                                    food_infinite=True,
@@ -25,10 +25,8 @@ def try_agent_action(agent: Agent,
     def manual_step(action: ActType):
         # env._agent_move_async(action)
         env._agent_move(action)
-        env._agents_to_medium()
-
-        env._agent_feed(action)
         env._agent_act_on_medium(action)
+        env._agent_feed(action)
         env._agent_lifecycle()
 
         env._medium_resource_dynamics()
@@ -62,18 +60,18 @@ def try_random_agent(**kwargs):
     return agent
 
 
-def try_gradient_agent(field_size, **kwargs):
-    agent = GradientAgent(field_size,
-                          inertia=0.98, scale=0.1, deposit=5,
-                          kind='gaussian_noise', noise_scale=0.001,
+def try_gradient_agent(num_agents, **kwargs):
+    agent = GradientAgent(num_agents,
+                          inertia=0.98, scale=0.025, deposit=5,
+                          kind='gaussian_noise', noise_scale=0.,
                           normalized_grad=True)
     return agent
 
 
-def try_physarum_agent(field_size, **kwargs):
-    agent = PhysarumAgent(field_size,
+def try_physarum_agent(num_agents, **kwargs):
+    agent = PhysarumAgent(num_agents,
                           turn_angle=33,
-                          inertia=0.0, scale=0.005, deposit=4,
+                          inertia=0.0, scale=0.015, deposit=4,
                           noise_scale=0.00,
                           normalized_grad=True)
     return agent
@@ -84,14 +82,15 @@ if __name__ == '__main__':
 
     # field_size = (512, 512)
     # field_size = (256, 256)
-    # field_size = (156, 156)
-    field_size = (94, 94)
+    field_size = (156, 156)
+    # field_size = (94, 94)
     # field_size = (32, 32)
+    num_agents = field_size[0] * field_size[1]
 
     # agent = try_const_agent()
     # agent = try_random_agent()
-    # agent = try_gradient_agent(field_size=field_size)
-    agent = try_physarum_agent(field_size=field_size)
+    agent = try_gradient_agent(num_agents)
+    # agent = try_physarum_agent(num_agents)
 
     try_agent_action(agent, field_size, iters=1000)
 

@@ -1,18 +1,13 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
-from functools import lru_cache
-from typing import Optional, Union, List, Tuple, TypeVar, Callable, Sequence
+from typing import Optional, Tuple, Callable
 
 import numpy as np
 import scipy
-from sklearn.preprocessing import normalize
 import xarray as da
-import gymnasium as gym
 
-from core import utils
-from core.base_types import ActType, ObsType, MaskType, AgtType, MediumType
+from core.base_types import ActType, ObsType, AgtType
 from core.data_init import DataInitializer
-from core.utils import z2polar, polar2z, xy2polar, polar2xy, renormalize_radians, discretize
+from core.utils import xy2polar, polar2xy, renormalize_radians, discretize, AgentIndexer
 
 
 class Agent(ABC):
@@ -65,18 +60,18 @@ class GradientAgent(Agent):
     kinds = ('const', 'gaussian_noise')
 
     def __init__(self,
-                 field_size: Tuple[int, int],
+                 num_agents: int,
                  scale: float = 1.0,
                  deposit: float = 0.1,
                  inertia: float = 0.5,
                  kind: str = 'gaussian_noise',
-                 noise_scale: float = 0.025,
+                 noise_scale: float = 0.025,  # is measured as fraction of 'scale'
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
                  ):
         if kind not in self.kinds:
             raise ValueError(f'Unknown kind of agent {kind}')
-        self._field_size = field_size
+        self._size = num_agents
         self._rng = np.random.default_rng()
         self._kind = kind or self.kinds[0]
         self._noise_scale = noise_scale
@@ -89,11 +84,10 @@ class GradientAgent(Agent):
 
     def _get_some_noise(self):
         ncoords = 2
-        noise = self._rng.normal(loc=0., scale=0.4,
-                                 size=(ncoords, *self._field_size))
+        noise = self._rng.normal(loc=0., scale=0.4, size=(ncoords, self._size))
         return noise
 
-    def _get_gradient(self, field) -> np.ndarray:
+    def _get_gradient(self, field: da.DataArray) -> da.DataArray:
         # coordinate grads are grouped into the first axis through 'np.stack'
         grad = np.stack(np.gradient(field))
         norm = scipy.linalg.norm(grad, axis=0, ord=2)
@@ -102,7 +96,11 @@ class GradientAgent(Agent):
         if self._grad_clip is not None:
             # Apply mask for too small gradients
             grad *= (norm >= self._grad_clip)
-        return grad
+        return da.DataArray(data=grad,
+                            coords={'channel': ['dx', 'dy'],
+                                    'x': field.coords['x'],
+                                    'y': field.coords['y'],
+                                    })
 
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
         """Designed for custom processing in gradient agent subclasses."""
@@ -123,19 +121,22 @@ class GradientAgent(Agent):
         coords = ['dx', 'dy']
         agents, medium = obs
         action = DataInitializer.init_action_for(agents)
+        idx = AgentIndexer(agents)
         chemical = medium.sel(channel='chem1')
 
         # Compute chemical gradient with custom processing
-        grad = self._get_gradient(chemical)
-        grad = self._process_gradient(grad)
-        grad = self._process_momentum(grad)
+        grad_field = self._get_gradient(chemical)
+        grad_per_agent = idx.field_by_agents(grad_field, only_alive=False)
+        grad_per_agent = self._process_gradient(grad_per_agent)
+        grad_per_agent = self._process_momentum(grad_per_agent)
 
         # Chemical deposit relative to discovered food
-        medium_food = medium.sel(channel='env_food')
-        deposit = self._deposit * medium_food
+        food = medium.sel(channel='env_food')
+        sensed_medium_food = idx.field_by_agents(food, only_alive=False)
+        deposit = self._deposit * sensed_medium_food
 
         # Assign action
-        action.loc[dict(channel=coords)] = grad * self._scale
+        action.loc[dict(channel=coords)] = grad_per_agent * self._scale
         action.loc[dict(channel='deposit1')] = deposit
 
         # return self.postprocess_action(agents, action)
@@ -144,7 +145,7 @@ class GradientAgent(Agent):
 
 class PhysarumAgent(GradientAgent):
     def __init__(self,
-                 field_size: Tuple[int, int],
+                 num_agents: int,
                  scale: float = 0.01,
                  deposit: float = 0.1,
                  inertia: float = 0.5,
@@ -154,7 +155,7 @@ class PhysarumAgent(GradientAgent):
                  grad_clip: Optional[float] = 1e-5,
                  turn_angle: int = 30,
                  ):
-        super().__init__(field_size,
+        super().__init__(num_agents,
                          scale, deposit, inertia,
                          kind, noise_scale,
                          normalized_grad, grad_clip)
@@ -234,7 +235,7 @@ class RandomAgent(Agent):
             .with_noise('dx', -s, s) \
             .with_noise('dy', -s, s) \
             .with_noise('deposit1', 0., self._dep_scale) \
-            .build()
+            .build_agents()
 
         return action
         # return self.postprocess_action(agents, action)
