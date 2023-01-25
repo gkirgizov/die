@@ -31,7 +31,7 @@ class FieldTrace:
 class EnvDrawer:
     def __init__(self,
                  field_size: Tuple[int, int],
-                 size: float = 8,
+                 size: float = 6,
                  aspect: float = 1.0,
                  with_grid_agents=False,
                  color_mapper: Optional[Callable] = None):
@@ -42,11 +42,13 @@ class EnvDrawer:
         self.fig, axs = plt.subplots(nrows=2, ncols=2, figsize=figsize,
                                      gridspec_kw={'width_ratios': [1, 1],
                                                   'height_ratios': [1, 1]})
+        self.fig.tight_layout()
         self._rgb_mapper = color_mapper or (lambda rgba: rgba)
 
         self.field_size = field_size
         (medium_ax, trace_ax), (agent_ax, spare_ax) = axs
         self._agent_trace = FieldTrace(field_size)
+        self._disable_ticks(medium_ax)
         self._disable_ticks(trace_ax)
         self._disable_ticks(agent_ax, with_grid=with_grid_agents)
         self._disable_ticks(spare_ax)
