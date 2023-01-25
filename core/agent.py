@@ -92,7 +92,8 @@ class GradientAgent(Agent):
         grad = np.stack(np.gradient(field))
         norm = scipy.linalg.norm(grad, axis=0, ord=2)
         if self._normalized:
-            grad = np.nan_to_num(grad / norm)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                grad = np.nan_to_num(np.true_divide(grad, norm))
         if self._grad_clip is not None:
             # Apply mask for too small gradients
             grad *= (norm >= self._grad_clip)

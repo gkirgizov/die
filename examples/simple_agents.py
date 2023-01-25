@@ -1,5 +1,6 @@
 import logging
 
+import matplotlib.pyplot
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -78,7 +79,10 @@ def try_physarum_agent(num_agents, **kwargs):
 
 
 if __name__ == '__main__':
+    # setup logging
     logging.basicConfig(level=logging.INFO)
+    # disable matplotlib warnings, mabye put that into EnvDrawer
+    matplotlib.pyplot.set_loglevel('error')
 
     # field_size = (512, 512)
     # field_size = (256, 256)
