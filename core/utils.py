@@ -88,3 +88,12 @@ def renormalize_radians(rads):
 
 def discretize(value, step):
     return (value // step) * step
+
+
+def print_angles(prefix, radians):
+    print(prefix, np.rad2deg(radians).astype(int))
+
+
+def np_info(grad):
+    return (f'max: {np.max(grad)}, min: {np.min(grad)}, '
+            f'avg: {np.mean(grad)}, std: {np.std(grad)}')

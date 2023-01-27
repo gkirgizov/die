@@ -21,6 +21,7 @@ def try_agent_action(agent: Agent,
                                    # op_food_flow=food_flow,
                                    # food_infinite=False,
                                    food_infinite=True,
+                                   diffuse_sigma=.4, rate_decay_chem=0.05,
                                    ))
 
     def manual_step(action: ActType):
@@ -71,9 +72,13 @@ def try_gradient_agent(num_agents, **kwargs):
 
 def try_physarum_agent(num_agents, **kwargs):
     agent = PhysarumAgent(num_agents,
-                          turn_angle=33,
-                          inertia=0.0, scale=0.015, deposit=4,
-                          noise_scale=0.00,
+                          turn_angle=35,
+                          sense_angle=90,
+                          turn_tolerance=0.05,
+                          inertia=0.,
+                          scale=0.01,
+                          deposit=0.5,
+                          noise_scale=0.0,
                           normalized_grad=True)
     return agent
 

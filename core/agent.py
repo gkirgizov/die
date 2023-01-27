@@ -7,7 +7,7 @@ import xarray as da
 
 from core.base_types import ActType, ObsType, AgtType
 from core.data_init import DataInitializer
-from core.utils import xy2polar, polar2xy, renormalize_radians, discretize, AgentIndexer
+from core.utils import xy2polar, polar2xy, renormalize_radians, discretize, AgentIndexer, print_angles, np_info
 
 
 class Agent(ABC):
@@ -155,14 +155,18 @@ class PhysarumAgent(GradientAgent):
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
                  turn_angle: int = 30,
+                 sense_angle: int = 90,
+                 turn_tolerance: float = 0.1,  # relative (to turn angle) tolerance for definite turn
                  ):
         super().__init__(num_agents,
                          scale, deposit, inertia,
                          kind, noise_scale,
                          normalized_grad, grad_clip)
         self._turn_radians = np.radians(turn_angle)
-        self._rtol = 1e-2   # relative tolerance to turn angle
+        self._sense_radians = np.radians(sense_angle)
+        self._rtol = turn_tolerance
         self._direction_rads = self._discretize_grad(self._prev_grad)
+        print_angles('init', self._direction_rads)
 
     def _discretize_grad(self, grad):
         x, y = grad
@@ -170,15 +174,37 @@ class PhysarumAgent(GradientAgent):
         rads = discretize(rads, self._turn_radians)
         return rads
 
-    def _choose_turn(self, dir_delta: np.ndarray) -> np.ndarray:
+    def _choose_turn(self, drads: np.ndarray) -> np.ndarray:
         """Chooses a turn based on delta between desired & actual direction"""
+        # Compute delta between actual direction & chemical gradient direction
+        dir_delta = self._direction_rads - drads
+        dir_delta = renormalize_radians(dir_delta)
         atol = self._turn_radians * self._rtol
+
         # Random turn for indeterminate gradients
-        undetermined = np.isclose(0, dir_delta, rtol=1e-2, atol=atol)
-        turn = self._turn_radians * (np.random.randint(0, 2, undetermined.shape) - 0.5) * 2
+        undetermined_grad = np.isclose(0, drads, rtol=1e-5)
+        undetermined_turn = np.isclose(0, dir_delta, rtol=1e-2, atol=atol)
+        unseen_grad = abs(dir_delta) > self._sense_radians
+        undetermined = undetermined_grad | undetermined_turn | unseen_grad
+        rand_choice = (np.random.randint(0, 2, undetermined.shape) - 0.5) * 2
+
         # Turn right or left, except for undetermined values where random turn is made
-        turn[dir_delta > atol] = self._turn_radians  # right
-        turn[dir_delta < -atol] = -self._turn_radians  # left
+        turn = rand_choice
+        turn[dir_delta > atol] = -1  # right, clockwise
+        turn[dir_delta < -atol] = 1 # left, counter-clockwise
+        turn[undetermined] = rand_choice[undetermined]
+        turn *= self._turn_radians
+
+        # detailed logging for debug
+        print()
+        print_angles('dir', self._direction_rads[:10])
+        print_angles('grd', drads[:10])
+        dir_delta0 = self._direction_rads - drads
+        print_angles('dt0', dir_delta0[:10])
+        print_angles('dlt', dir_delta[:10])
+        print_angles('trn', turn[:10])
+        print_angles('tr0', (turn * np.logical_not(undetermined))[:10])
+
         return turn
 
     def _discrete_turn(self, grad: np.ndarray) -> np.ndarray:
@@ -186,22 +212,21 @@ class PhysarumAgent(GradientAgent):
         dx, dy = grad
         dr, drads = xy2polar(dx, dy)  # radian values are already normalized in (-pi, pi]
 
-        # Compute delta between actual direction & chemical gradient direction
-        dir_delta = self._direction_rads - drads
         # Make discrete movement choice
-        turn_radians = self._choose_turn(dir_delta)
-        # Compute full direction
-        # self._direction_rads = turn_radians
-        self._direction_rads += turn_radians
-        self._direction_rads = renormalize_radians(self._direction_rads)
+        turn_radians = self._choose_turn(drads)
+        # Compute new direction
+        self._direction_rads = renormalize_radians(self._direction_rads + turn_radians)
 
         # Convert back from radians to (dx, dy)
         dr = 1. if self._normalized else dr
         grad = np.stack(polar2xy(dr, self._direction_rads))
+        print(np_info(grad))
         return grad
 
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
         delta_grad = self._discrete_turn(grad)
+        # delta_grad = np.stack(polar2xy(1., self._direction_rads))  # const direction
+        # delta_grad = np.stack(polar2xy(1., drads := self._discretize_grad(grad)))  # just turn
         return delta_grad
 
 
