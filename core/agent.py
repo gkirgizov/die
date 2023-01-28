@@ -57,23 +57,17 @@ class GradientAgent(Agent):
     - Passive selection by dying? vs. Active chemical trail depending on amount of food seen.
     """
 
-    kinds = ('const', 'gaussian_noise')
-
     def __init__(self,
                  num_agents: int,
                  scale: float = 1.0,
                  deposit: float = 0.1,
                  inertia: float = 0.5,
-                 kind: str = 'gaussian_noise',
                  noise_scale: float = 0.025,  # is measured as fraction of 'scale'
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
                  ):
-        if kind not in self.kinds:
-            raise ValueError(f'Unknown kind of agent {kind}')
         self._size = num_agents
         self._rng = np.random.default_rng()
-        self._kind = kind or self.kinds[0]
         self._noise_scale = noise_scale
         self._scale = scale
         self._deposit = deposit
@@ -116,7 +110,7 @@ class GradientAgent(Agent):
         # Compute gradient (i.e. direction) with inertia
         grad = (1 - self._inertia) * grad + self._inertia * self._prev_grad
         # Compute final value with noise
-        noise = self._get_some_noise() if self._kind == 'gaussian_noise' else 0
+        noise = self._get_some_noise()
         grad += self._noise_scale * noise
         # Store grad for the next computation
         self._prev_grad = grad
@@ -154,7 +148,6 @@ class PhysarumAgent(GradientAgent):
                  scale: float = 0.01,
                  deposit: float = 0.1,
                  inertia: float = 0.5,
-                 kind: str = 'gaussian_noise',
                  noise_scale: float = 0.025,
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
@@ -165,7 +158,7 @@ class PhysarumAgent(GradientAgent):
                  ):
         super().__init__(num_agents,
                          scale, deposit, inertia,
-                         kind, noise_scale,
+                         noise_scale,
                          normalized_grad, grad_clip)
         self._turn_radians = np.radians(turn_angle)
         self._sense_radians = np.radians(sense_angle)

@@ -66,7 +66,7 @@ def try_random_agent(**kwargs):
 def try_gradient_agent(num_agents, **kwargs):
     agent = GradientAgent(num_agents,
                           inertia=0.98, scale=0.025, deposit=5,
-                          kind='gaussian_noise', noise_scale=0.,
+                          noise_scale=0.,
                           normalized_grad=True)
     return agent
 
