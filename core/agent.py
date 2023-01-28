@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Callable
+from typing import Optional, Tuple, Callable, Union
 
 import numpy as np
 import scipy
@@ -103,6 +103,10 @@ class GradientAgent(Agent):
                                     'y': field.coords['y'],
                                     })
 
+    @property
+    def _sense_offset(self) -> Union[float, np.ndarray, da.DataArray]:
+        return 0.
+
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
         """Designed for custom processing in gradient agent subclasses."""
         return grad
@@ -127,7 +131,7 @@ class GradientAgent(Agent):
 
         # Compute chemical gradient with custom processing
         grad_field = self._get_gradient(chemical)
-        grad_per_agent = idx.field_by_agents(grad_field, only_alive=False)
+        grad_per_agent = idx.field_by_agents(grad_field, only_alive=False, offset=self._sense_offset)
         grad_per_agent = self._process_gradient(grad_per_agent)
         grad_per_agent = self._process_momentum(grad_per_agent)
 
@@ -156,6 +160,7 @@ class PhysarumAgent(GradientAgent):
                  grad_clip: Optional[float] = 1e-5,
                  turn_angle: int = 30,
                  sense_angle: int = 90,
+                 sense_offset: float = 0.,
                  turn_tolerance: float = 0.1,  # relative (to turn angle) tolerance for definite turn
                  ):
         super().__init__(num_agents,
@@ -164,6 +169,7 @@ class PhysarumAgent(GradientAgent):
                          normalized_grad, grad_clip)
         self._turn_radians = np.radians(turn_angle)
         self._sense_radians = np.radians(sense_angle)
+        self._sense_offset_scale = sense_offset
         self._rtol = turn_tolerance
         self._direction_rads = self._discretize_grad(self._prev_grad)
         print_angles('init', self._direction_rads)
@@ -173,6 +179,11 @@ class PhysarumAgent(GradientAgent):
         _, rads = xy2polar(x, y)
         rads = discretize(rads, self._turn_radians)
         return rads
+
+    @property
+    def _sense_offset(self) -> np.ndarray:
+        offset_xy = np.stack(polar2xy(self._sense_offset_scale, self._direction_rads))
+        return offset_xy
 
     def _choose_turn(self, drads: np.ndarray) -> np.ndarray:
         """Chooses a turn based on delta between desired & actual direction"""

@@ -19,15 +19,20 @@ class AgentIndexer:
         agent_coords = {ch: agent_cells.coords[ch] for ch in coord_chans}
         return agent_coords
 
-    def field_by_agents(self, field: da.DataArray, only_alive=True) -> da.DataArray:
-        """Returns array of channels selected from field per agent in agents array."""
+    def field_by_agents(self, field: da.DataArray, only_alive=True, offset=0.) -> da.DataArray:
+        """Returns array of channels selected from field per agent in agents array.
+
+        :param field:
+        :param only_alive:
+        :param offset: global or per agent offset for indexing the field.
+        """
         coord_chans = ['x', 'y']
         # Pointwise approximate indexing:
         #  get mapping AGENT_IDX->ACTION as a sequence
         #  details: https://docs.xarray.dev/en/stable/user-guide/indexing.html#more-advanced-indexing
         agents = self.get_alive_agents() if only_alive else self.__agents
-        cell_indexer = {coord_ch: agents.sel(channel=coord_ch)
-                        for coord_ch in coord_chans}
+        idx_coords = agents.sel(channel=coord_chans) + offset
+        cell_indexer = dict(zip(coord_chans, idx_coords))
         field_selection = field.sel(**cell_indexer, method='nearest')
         return field_selection
 

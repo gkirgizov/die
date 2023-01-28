@@ -74,6 +74,7 @@ def try_physarum_agent(num_agents, **kwargs):
     agent = PhysarumAgent(num_agents,
                           turn_angle=35,
                           sense_angle=90,
+                          sense_offset=0.01,
                           turn_tolerance=0.05,
                           inertia=0.,
                           scale=0.01,
