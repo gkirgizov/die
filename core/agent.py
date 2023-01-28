@@ -7,7 +7,7 @@ import xarray as da
 
 from core.base_types import ActType, ObsType, AgtType
 from core.data_init import DataInitializer
-from core.utils import xy2polar, polar2xy, renormalize_radians, discretize, AgentIndexer
+from core.utils import xy2polar, polar2xy, renormalize_radians, discretize, AgentIndexer, get_radians
 
 
 class Agent(ABC):
@@ -62,6 +62,7 @@ class GradientAgent(Agent):
                  scale: float = 1.0,
                  deposit: float = 0.1,
                  inertia: float = 0.5,
+                 sense_offset: float = 0.,
                  noise_scale: float = 0.025,  # is measured as fraction of 'scale'
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
@@ -72,9 +73,12 @@ class GradientAgent(Agent):
         self._scale = scale
         self._deposit = deposit
         self._inertia = inertia
+        self._sense_offset_scale = sense_offset
         self._normalized = normalized_grad
         self._grad_clip = grad_clip
+
         self._prev_grad = self._get_some_noise()
+        self._direction_rads = get_radians(self._prev_grad)
 
     def _get_some_noise(self):
         ncoords = 2
@@ -84,6 +88,7 @@ class GradientAgent(Agent):
     def _get_gradient(self, field: da.DataArray) -> da.DataArray:
         # coordinate grads are grouped into the first axis through 'np.stack'
         grad = np.stack(np.gradient(field))
+
         norm = scipy.linalg.norm(grad, axis=0, ord=2)
         if self._normalized:
             with np.errstate(divide='ignore', invalid='ignore'):
@@ -91,6 +96,7 @@ class GradientAgent(Agent):
         if self._grad_clip is not None:
             # Apply mask for too small gradients
             grad *= (norm >= self._grad_clip)
+
         return da.DataArray(data=grad,
                             coords={'channel': ['dx', 'dy'],
                                     'x': field.coords['x'],
@@ -98,8 +104,9 @@ class GradientAgent(Agent):
                                     })
 
     @property
-    def _sense_offset(self) -> Union[float, np.ndarray, da.DataArray]:
-        return 0.
+    def _sense_offset(self) -> np.ndarray:
+        offset_xy = np.stack(polar2xy(self._sense_offset_scale, self._direction_rads))
+        return offset_xy
 
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
         """Designed for custom processing in gradient agent subclasses."""
@@ -129,6 +136,9 @@ class GradientAgent(Agent):
         grad_per_agent = self._process_gradient(grad_per_agent)
         grad_per_agent = self._process_momentum(grad_per_agent)
 
+        # Update agent direction after all transformations
+        self._direction_rads = get_radians(grad_per_agent)
+
         # Chemical deposit relative to discovered food
         food = medium.sel(channel='env_food')
         sensed_medium_food = idx.field_by_agents(food, only_alive=False)
@@ -148,34 +158,26 @@ class PhysarumAgent(GradientAgent):
                  scale: float = 0.01,
                  deposit: float = 0.1,
                  inertia: float = 0.5,
+                 sense_offset: float = 0.,
                  noise_scale: float = 0.025,
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
                  turn_angle: int = 30,
                  sense_angle: int = 90,
-                 sense_offset: float = 0.,
                  turn_tolerance: float = 0.1,  # relative (to turn angle) tolerance for definite turn
                  ):
         super().__init__(num_agents,
                          scale, deposit, inertia,
+                         sense_offset,
                          noise_scale,
                          normalized_grad, grad_clip)
         self._turn_radians = np.radians(turn_angle)
         self._sense_radians = np.radians(sense_angle)
-        self._sense_offset_scale = sense_offset
         self._rtol = turn_tolerance
         self._direction_rads = self._discretize_grad(self._prev_grad)
 
     def _discretize_grad(self, grad):
-        x, y = grad
-        _, rads = xy2polar(x, y)
-        rads = discretize(rads, self._turn_radians)
-        return rads
-
-    @property
-    def _sense_offset(self) -> np.ndarray:
-        offset_xy = np.stack(polar2xy(self._sense_offset_scale, self._direction_rads))
-        return offset_xy
+        return discretize(get_radians(grad), self._turn_radians)
 
     def _choose_turn(self, drads: np.ndarray) -> np.ndarray:
         """Chooses a turn based on delta between desired & actual direction"""
@@ -208,17 +210,16 @@ class PhysarumAgent(GradientAgent):
         # Make discrete movement choice
         turn_radians = self._choose_turn(drads)
         # Compute new direction
-        self._direction_rads = renormalize_radians(self._direction_rads + turn_radians)
+        directions = renormalize_radians(self._direction_rads + turn_radians)
 
         # Convert back from radians to (dx, dy)
         dr = 1. if self._normalized else dr
-        grad = np.stack(polar2xy(dr, self._direction_rads))
+        grad = np.stack(polar2xy(dr, directions))
         return grad
 
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
         delta_grad = self._discrete_turn(grad)
         # delta_grad = np.stack(polar2xy(1., self._direction_rads))  # const direction
-        # delta_grad = np.stack(polar2xy(1., drads := self._discretize_grad(grad)))  # just turn
         return delta_grad
 
 

@@ -86,6 +86,12 @@ def xy2polar(x, y):
     return z2polar(x + np.multiply(1j, y))
 
 
+def get_radians(coords):
+    x, y = coords
+    _, rads = xy2polar(x, y)
+    return rads
+
+
 def renormalize_radians(rads):
     """Renormalizes radians in (-np.pi, np.pi] interval."""
     return (rads - np.pi) % (-2 * np.pi) + np.pi
