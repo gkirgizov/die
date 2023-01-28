@@ -21,6 +21,7 @@ def try_agent_action(agent: Agent,
                                    # op_food_flow=food_flow,
                                    # food_infinite=False,
                                    food_infinite=True,
+                                   apply_sense_mask=False,
                                    diffuse_sigma=.4, rate_decay_chem=0.05,
                                    ))
 
@@ -95,12 +96,13 @@ if __name__ == '__main__':
     field_size = (156, 156)
     # field_size = (94, 94)
     # field_size = (32, 32)
+    # field_size = (16, 16)
     num_agents = field_size[0] * field_size[1]
 
     # agent = try_const_agent()
     # agent = try_random_agent()
-    agent = try_gradient_agent(num_agents)
-    # agent = try_physarum_agent(num_agents)
+    # agent = try_gradient_agent(num_agents)
+    agent = try_physarum_agent(num_agents)
 
     try_agent_action(agent, field_size, iters=1000)
 

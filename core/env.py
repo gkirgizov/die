@@ -48,6 +48,7 @@ class Dynamics:
     diffuse_sigma: float = 1.0
 
     # test options?
+    apply_sense_mask: bool = True,
     food_infinite: bool = False
     agents_die: bool = False
     agents_born: bool = False
@@ -65,8 +66,8 @@ class Env(gym.Env[ObsType, ActType]):
         self.dynamics = dynamics or Dynamics()
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
-            .with_const('env_food', 0.5) \
             .with_food_perlin(threshold=1.0, octaves=4) \
+            .with_const('env_food', 0.5) \
             .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
 
@@ -264,9 +265,14 @@ class Env(gym.Env[ObsType, ActType]):
         """Get sense mask (neighbourhood of agents)
         by diffusing agent points and rounding up."""
         agents = self.medium.sel(channel='agents')
-        # sigma=0.4 round=3 for square neighbourhood=1
-        # sigma=0.4 round=2 for star neighbourhood=1
-        sense_mask = np.ceil(filters.gaussian(agents, sigma=0.4).round(3))
+        if self.dynamics.apply_sense_mask:
+            # sigma=0.4 round=3 for square neighbourhood=1
+            # sigma=0.4 round=2 for star neighbourhood=1
+            # sigma=1.0 round=2 for circle neighbourhood=3
+            # sigma=2.0 round=2 for circle neighbourhood=5
+            sense_mask = np.ceil(filters.gaussian(agents, sigma=2.0).round(3))
+        else:
+            sense_mask = np.ones_like(agents)
         return sense_mask
 
     @property
