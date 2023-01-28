@@ -7,7 +7,7 @@ import xarray as da
 
 from core.base_types import ActType, ObsType, AgtType
 from core.data_init import DataInitializer
-from core.utils import xy2polar, polar2xy, renormalize_radians, discretize, AgentIndexer, print_angles, np_info
+from core.utils import xy2polar, polar2xy, renormalize_radians, discretize, AgentIndexer
 
 
 class Agent(ABC):
@@ -165,7 +165,6 @@ class PhysarumAgent(GradientAgent):
         self._sense_offset_scale = sense_offset
         self._rtol = turn_tolerance
         self._direction_rads = self._discretize_grad(self._prev_grad)
-        print_angles('init', self._direction_rads)
 
     def _discretize_grad(self, grad):
         x, y = grad
@@ -199,16 +198,6 @@ class PhysarumAgent(GradientAgent):
         turn[undetermined] = rand_choice[undetermined]
         turn *= self._turn_radians
 
-        # detailed logging for debug
-        print()
-        print_angles('dir', self._direction_rads[:10])
-        print_angles('grd', drads[:10])
-        dir_delta0 = self._direction_rads - drads
-        print_angles('dt0', dir_delta0[:10])
-        print_angles('dlt', dir_delta[:10])
-        print_angles('trn', turn[:10])
-        print_angles('tr0', (turn * np.logical_not(undetermined))[:10])
-
         return turn
 
     def _discrete_turn(self, grad: np.ndarray) -> np.ndarray:
@@ -224,7 +213,6 @@ class PhysarumAgent(GradientAgent):
         # Convert back from radians to (dx, dy)
         dr = 1. if self._normalized else dr
         grad = np.stack(polar2xy(dr, self._direction_rads))
-        print(np_info(grad))
         return grad
 
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
