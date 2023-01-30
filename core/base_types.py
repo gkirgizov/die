@@ -1,4 +1,4 @@
-from typing import Callable, Union, Sequence, Hashable, Tuple
+from typing import Callable, Union, Sequence, Hashable, Tuple, Dict
 
 import numpy as np
 import xarray as da
@@ -9,6 +9,7 @@ ActType = da.DataArray
 AgtType = da.DataArray  # 1-channel array
 MediumType = da.DataArray
 ObsType = Tuple[AgtType, MediumType]
+FieldIdx = Dict[str, da.DataArray]  # pointwise indexer of MediumType
 
 Array = Union[np.ndarray, da.DataArray]
 Array1C = Array  # Single-channel 2D array

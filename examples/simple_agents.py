@@ -17,7 +17,7 @@ def try_agent_action(agent: Agent,
                      ):
     food_flow = \
         WaveSequence(field_size, dt=0.01).get_flow_operator(scale=0.8, decay=1)
-    env = Env(field_size, Dynamics(init_agent_ratio=0.15,
+    env = Env(field_size, Dynamics(init_agent_ratio=0.25,
                                    # op_food_flow=food_flow,
                                    # food_infinite=False,
                                    food_infinite=True,
@@ -28,7 +28,8 @@ def try_agent_action(agent: Agent,
     def manual_step(action: ActType):
         # env._agent_move_async(action)
         env._agent_move(action)
-        env._agent_act_on_medium(action)
+        env._agent_deposit_and_layout(action)
+
         env._agent_feed(action)
         env._agent_lifecycle()
 
@@ -65,8 +66,9 @@ def try_random_agent(**kwargs):
 
 def try_gradient_agent(num_agents, **kwargs):
     agent = GradientAgent(num_agents,
-                          inertia=0.98, scale=0.025, deposit=5,
-                          noise_scale=0.,
+                          inertia=0.0, scale=0.01, deposit=0.5,
+                          sense_offset=0.005,
+                          noise_scale=0.01,
                           normalized_grad=True)
     return agent
 
@@ -74,9 +76,10 @@ def try_gradient_agent(num_agents, **kwargs):
 def try_physarum_agent(num_agents, **kwargs):
     agent = PhysarumAgent(num_agents,
                           turn_angle=35,
-                          sense_angle=90,
-                          sense_offset=0.01,
+                          sense_angle=120,
+                          sense_offset=0.02,
                           turn_tolerance=0.05,
+
                           inertia=0.,
                           scale=0.01,
                           deposit=0.5,

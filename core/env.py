@@ -48,7 +48,7 @@ class Dynamics:
     diffuse_sigma: float = 1.0
 
     # test options?
-    apply_sense_mask: bool = True,
+    apply_sense_mask: bool = True
     food_infinite: bool = False
     agents_die: bool = False
     agents_born: bool = False
@@ -96,17 +96,20 @@ class Env(gym.Env[ObsType, ActType]):
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         """Each substep here leaves the world state valid and ready for the next substep."""
 
-        # NB: only agents that are alive (after lifecycle step) will move
+        # Motor stage
         # self._agent_move_async(action)
         self._agent_move(action)
-        # updates position of agents in medium array
-        self._agent_act_on_medium(action)
+        self._agent_deposit_and_layout(action)
+
+        # Lifecycle stage
         energy_gain = self._agent_feed(action)
         self._agent_lifecycle()
 
+        # Medium dynamics stage
         self._medium_resource_dynamics()
         self._medium_diffuse_decay()
 
+        # Return rewards & statistics
         num_agents = self._num_alive_agents
         total_gain = energy_gain.sum()
         reward = float(total_gain.values)
@@ -119,6 +122,7 @@ class Env(gym.Env[ObsType, ActType]):
         terminated = num_agents == 0
         truncated = False
 
+        # Then goes sensory stage by Agent
         return self._get_current_obs, reward, terminated, truncated, info
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
@@ -192,18 +196,18 @@ class Env(gym.Env[ObsType, ActType]):
             self.buffer_medium.loc[nearest_cxy] = agents[ixy]  # move agent data to new position
         self._rotate_agent_buffer()
 
-    def _agent_act_on_medium(self, action: ActType):
-        """Deposit chemical and agents themselves to medium field."""
+    def _agent_deposit_and_layout(self, action: ActType):
+        """Deposit chemical from agents to medium field and layout agents."""
         agent_coords = self._agent_idx.agents_to_field_coords(self.medium)
-        deposit = action.sel(channel='deposit1')
         alive = self.agents.sel(channel='alive')
+        deposit = action.sel(channel='deposit1')
 
-        # Set agent locations
+        # Deposit chemical
+        self.medium.loc[dict(**agent_coords, channel='chem1')] += deposit * alive
+        # Layout agents onto the field
         # TODO: make not binary but 'alive' continuous
         self.medium.loc[dict(channel='agents')] = 0
         self.medium.loc[dict(**agent_coords, channel='agents')] = alive
-        # Deposit chemical
-        self.medium.loc[dict(**agent_coords, channel='chem1')] += deposit * alive
 
     def _agent_feed(self, action: AgtType) -> Array1C:
         """Gains food from environment and consumes internal stock"""

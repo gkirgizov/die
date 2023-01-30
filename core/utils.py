@@ -3,7 +3,7 @@ from typing import Sequence, Dict
 import numpy as np
 import xarray as da
 
-from core.base_types import MediumType, AgtType
+from core.base_types import MediumType, AgtType, FieldIdx
 
 
 class AgentIndexer:
@@ -11,7 +11,7 @@ class AgentIndexer:
     def __init__(self, agents: AgtType):
         self.__agents = agents  # read-only here
 
-    def agents_to_field_coords(self, field: da.DataArray) -> Dict:
+    def agents_to_field_coords(self, field: da.DataArray) -> FieldIdx:
         coord_chans = ['x', 'y']
         # Agents array stores real-valued coordinates,
         #  so need first to get cells and only then get their coordinates.
