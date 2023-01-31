@@ -158,9 +158,11 @@ class DataInitializer:
 
     @staticmethod
     def action_for(agents: AgtType) -> 'DataInitializer':
+        mask = agents.sel(channel='alive').to_numpy()
         return DataInitializer(field_size=agents.shape[-1],
                                channels=DataChannels.actions,
-                               name='actions')
+                               name='actions',
+                               mask=mask)
 
     @staticmethod
     def get_random(size, a=0., b=1.) -> np.ndarray:
@@ -169,10 +171,12 @@ class DataInitializer:
     def __init__(self,
                  field_size: Tuple[int, int],
                  channels: Optional[Channels] = None,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 mask: Union[np.ndarray, float] = 1.):
         self._size = field_size
         self._channels = {chan: np.zeros(field_size) for chan in channels or ()}
         self._name = name
+        self._static_mask = mask
 
     def _mask(self, sampled: np.ndarray,
               mask_below: float = 0.0,
@@ -235,14 +239,14 @@ class DataInitializer:
         return np.stack(list(self._channels.values()))
 
     def build(self, name: Optional[str] = None) -> MediumType:
-        data = self.build_numpy()
+        data = self.build_numpy() * self._static_mask
         return DataInitializer.init_field_array(field_size=self._size,
                                                 channels=self._channels,
                                                 name=name,
                                                 init_data=data)
 
     def build_agents(self, name: Optional[str] = None) -> MediumType:
-        data = self.build_numpy()
+        data = self.build_numpy() * self._static_mask
         return DataInitializer.init_agential_array(num_agents=self._size,
                                                    channels=self._channels,
                                                    name=name,

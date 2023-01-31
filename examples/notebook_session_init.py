@@ -17,11 +17,12 @@ def get_test_fields(field_size, agents_ratio=0.2):
         .with_chem(threshold=0.25) \
         .build()
     agents = DataInitializer.agents_from_medium(medium)
-    action = DataInitializer(field_size, DataChannels.actions) \
-        .with_noise('dx', 0, 3) \
-        .with_noise('dy', 0, 2) \
+    s = 0.5
+    action = DataInitializer.action_for(agents) \
+        .with_noise('dx', -s, s) \
+        .with_noise('dy', -s, s) \
         .with_noise('deposit1', 0, 1) \
-        .build()
+        .build_agents()
     return medium, agents, action
 
 
@@ -30,6 +31,10 @@ field_sz = (8, 6)
 medium, agents, action = get_test_fields(field_sz)
 EnvDrawer(field_sz).show(medium, agents)
 plt.show()
+
+# Alive mask indexing
+alive = agents.sel(channel='alive')
+action.where(alive > 0.).dropna(dim='index')
 
 # Receipt for data assignment by approximate coords
 pos_range = medium.sel(x=[0.13, 0.4],
