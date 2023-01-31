@@ -1,3 +1,4 @@
+import logging
 from typing import Sequence, Dict
 
 import numpy as np
@@ -45,6 +46,41 @@ class AgentIndexer:
             indexer = dict(index=da.DataArray(agent_inds))
             alive_agents = self.__agents[indexer]
         return alive_agents
+
+
+class ChannelLogger:
+    def __init__(self,
+                 init_array: da.DataArray,
+                 channels: Sequence[str],
+                 num: int = -1):
+        self.num = num
+        self.chs = channels
+        self.data = 0.
+        self.delta = 0.
+        self.update(init_array[:, :self.num])
+        self._logger = print
+        # self._logger = logging.debug
+
+    def log_update(self, array: da.DataArray):
+        self.update(array[:, :self.num])
+        self.log(self.delta, 'delta')
+        self.log(self.data, 'data ')
+
+    def update(self, array: da.DataArray):
+        new_data = array.sel(channel=self.chs).to_numpy()
+        self.delta = new_data - self.data
+        self.data = new_data
+
+    def log(self, data, prefix=None, prec=3):
+        with np.printoptions(threshold=np.inf):
+            prefix = f'{prefix}: ' if prefix else ''
+            d = np.asarray(data).round(prec)
+            self._logger(f'{prefix}{np_info(d)}')
+            self._logger(f'{d}')
+
+    def log_nonzero(self, field):
+        non_zero = np.count_nonzero(field.sel(channel='agents'))
+        self._logger(f'num_nonzer0={non_zero}')
 
 
 def get_meshgrid(field_size: Sequence[int]) -> np.ndarray:
@@ -106,5 +142,6 @@ def print_angles(prefix, radians):
 
 
 def np_info(grad):
-    return (f'max: {np.max(grad)}, min: {np.min(grad)}, '
-            f'avg: {np.mean(grad)}, std: {np.std(grad)}')
+    return (f'shape: {np.shape(grad)}, unique: {len(np.unique(grad))}, '
+            f'max: {np.max(grad).round(3)}, min: {np.min(grad).round(3)}, '
+            f'avg: {np.mean(grad).round(3)}, std: {np.std(grad).round(3)}')

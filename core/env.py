@@ -14,7 +14,7 @@ from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperat
 from core.data_init import DataInitializer
 from core import utils
 from core.plotting import EnvDrawer
-from core.utils import AgentIndexer
+from core.utils import AgentIndexer, ChannelLogger
 
 RenderFrame = TypeVar('RenderFrame')
 
@@ -87,6 +87,9 @@ class Env(gym.Env[ObsType, ActType]):
                                  )
         self._drawer.show(self.medium, self.agents)  # initial show
 
+        self._log_agent = ChannelLogger(self.agents, channels=['x', 'y'], num=self._num_alive_agents)
+        self._log_agent.log_update(self.agents)
+
     def _rotate_agent_buffer(self, reset_data=0.):
         tmp = self.medium
         self.medium = self.buffer_medium
@@ -100,6 +103,9 @@ class Env(gym.Env[ObsType, ActType]):
         # self._agent_move_async(action)
         self._agent_move(action)
         self._agent_deposit_and_layout(action)
+
+        # self._log_agent.log_update(self.agents)
+        self._log_agent.log_nonzero(self.medium)
 
         # Lifecycle stage
         energy_gain = self._agent_feed(action)
@@ -208,6 +214,9 @@ class Env(gym.Env[ObsType, ActType]):
         # TODO: make not binary but 'alive' continuous
         self.medium.loc[dict(channel='agents')] = 0
         self.medium.loc[dict(**agent_coords, channel='agents')] = alive
+
+        self._log_agent.log(agent_coords['x'], 'coords[x]')
+        self._log_agent.log(agent_coords['y'], 'coords[y]')
 
     def _agent_feed(self, action: AgtType) -> Array1C:
         """Gains food from environment and consumes internal stock"""
