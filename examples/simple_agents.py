@@ -14,10 +14,11 @@ def try_agent_action(agent: Agent,
                      field_size=(256, 256),
                      iters=1000,
                      show_each=1,
+                     agent_ratio=0.15,
                      ):
     food_flow = \
         WaveSequence(field_size, dt=0.01).get_flow_operator(scale=0.8, decay=1)
-    env = Env(field_size, Dynamics(init_agent_ratio=0.25,
+    env = Env(field_size, Dynamics(init_agent_ratio=agent_ratio,
                                    # op_food_flow=food_flow,
                                    # food_infinite=False,
                                    food_infinite=True,
@@ -94,18 +95,19 @@ if __name__ == '__main__':
     # disable matplotlib warnings, mabye put that into EnvDrawer
     matplotlib.pyplot.set_loglevel('error')
 
-    # field_size = (512, 512)
-    # field_size = (256, 256)
-    field_size = (156, 156)
-    # field_size = (94, 94)
-    # field_size = (32, 32)
-    # field_size = (16, 16)
-    num_agents = field_size[0] * field_size[1]
+    # field_size = 512
+    # field_size = 256
+    # field_size = 156
+    # field_size = 94
+    # field_size = 32
+    field_size = 12
+    num_agents = field_size * field_size
 
     # agent = try_const_agent()
-    # agent = try_random_agent()
+    agent = try_random_agent()
     # agent = try_gradient_agent(num_agents)
-    agent = try_physarum_agent(num_agents)
+    # agent = try_physarum_agent(num_agents)
 
-    try_agent_action(agent, field_size, iters=1000)
+    try_agent_action(agent, (field_size, field_size),
+                     iters=1000, agent_ratio=0.02)
 

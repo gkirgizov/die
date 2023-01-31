@@ -84,9 +84,15 @@ Necessary core
       - [ ] Exp check that order of operations is logical:
             - Deposit happens after medium diffuse & agent sensing & grad compute
               so that they don't sense their own trails so much.
-      - [ ] create gradient + offset agent
+            - Actually, Move must happen after Deposit => sense will be more pure
+      - [ ] make agent deposit only on successfull turn
+      - [x] create gradient + offset agent
             separate Blind zone, Discretization, Sense offset from basic GradAgent
             why? allow same gradient agent but with additional conditions
+      Fixes
+      - [ ] align sense mask on Medium with Agent's sense mask
+      - [ ] fix "Jittering" agents
+        h1: conflicting write to 'agents' channel with duplicate index
 
       Experiment Log. Modifications (a-d):
 
@@ -108,11 +114,6 @@ Necessary core
           Really helps. Agents bein to move "ahead".
           *Maybe* it is a quazi-prediction of where the food will be available?
           - [ ] EXP NOTE maybe learning agents will come up with something like that?
-
-      Fixes
-      - [ ] align sense mask on Medium with Agent's sense mask
-      - [ ] fix "Jittering" agents
-
 
       - [ ] setup clear Reward & performance characteristics (allmost done)
       - [ ] setup baseline Dynamics hyperparams
