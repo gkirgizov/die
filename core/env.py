@@ -88,7 +88,7 @@ class Env(gym.Env[ObsType, ActType]):
         self._drawer.show(self.medium, self.agents)  # initial show
 
         self._log_agent = ChannelLogger(self.agents, channels=['x', 'y'], num=self._num_alive_agents)
-        self._log_agent.log_update(self.agents)
+        # self._log_agent.log_update(self.agents)
 
     def _rotate_agent_buffer(self, reset_data=0.):
         tmp = self.medium
@@ -105,7 +105,7 @@ class Env(gym.Env[ObsType, ActType]):
         self._agent_deposit_and_layout(action)
 
         # self._log_agent.log_update(self.agents)
-        self._log_agent.log_nonzero(self.medium)
+        # self._log_agent.log_nonzero(self.medium)
 
         # Lifecycle stage
         energy_gain = self._agent_feed(action)
@@ -215,8 +215,8 @@ class Env(gym.Env[ObsType, ActType]):
         self.medium.loc[dict(channel='agents')] = 0
         self.medium.loc[dict(**agent_coords, channel='agents')] = 1.
 
-        self._log_agent.log(agent_coords['x'], 'coords[x]')
-        self._log_agent.log(agent_coords['y'], 'coords[y]')
+        # # self._log_agent.log(agent_coords['x'], 'coords[x]')
+        # self._log_agent.log(agent_coords['y'], 'coords[y]')
 
     def _agent_feed(self, action: AgtType) -> Array1C:
         """Gains food from environment and consumes internal stock"""
