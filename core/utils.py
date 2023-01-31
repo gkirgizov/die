@@ -4,21 +4,27 @@ from typing import Sequence, Dict
 import numpy as np
 import xarray as da
 
-from core.base_types import MediumType, AgtType, FieldIdx
+from core.base_types import MediumType, AgtType, FieldIdx, ActType
 
 
 class AgentIndexer:
 
-    def __init__(self, agents: AgtType):
+    def __init__(self, field_size, agents: AgtType):
         self.__agents = agents  # read-only here
+        self.__coordgrid = get_meshgrid(field_size)
 
-    def agents_to_field_coords(self, field: da.DataArray) -> FieldIdx:
+    def agents_to_field_coords(self, field: da.DataArray, only_alive=True) -> FieldIdx:
         coord_chans = ['x', 'y']
         # Agents array stores real-valued coordinates,
         #  so need first to get cells and only then get their coordinates.
-        agent_cells = self.field_by_agents(field, only_alive=False)
+        agent_cells = self.field_by_agents(field, only_alive)
         agent_coords = {ch: agent_cells.coords[ch] for ch in coord_chans}
         return agent_coords
+
+    def action_by_agents(self, action: ActType) -> da.DataArray:
+        alive = self.__agents.sel(channel='alive')
+        masked_action = action.where(alive > 0.).dropna(dim='index')
+        return masked_action
 
     def field_by_agents(self, field: da.DataArray, only_alive=True, offset=0.) -> da.DataArray:
         """Returns array of channels selected from field per agent in agents array.

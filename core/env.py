@@ -73,7 +73,7 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.agents = DataInitializer.agents_from_medium(self.medium)
 
-        self._agent_idx = AgentIndexer(self.agents)
+        self._agent_idx = AgentIndexer(field_size, self.agents)
 
         self.buffer_medium = self.medium.copy(deep=True)
 
@@ -205,15 +205,15 @@ class Env(gym.Env[ObsType, ActType]):
     def _agent_deposit_and_layout(self, action: ActType):
         """Deposit chemical from agents to medium field and layout agents."""
         agent_coords = self._agent_idx.agents_to_field_coords(self.medium)
-        alive = self.agents.sel(channel='alive')
-        deposit = action.sel(channel='deposit1')
+        alive_action = self._agent_idx.action_by_agents(action)
+        deposit = alive_action.sel(channel='deposit1')
 
         # Deposit chemical
-        self.medium.loc[dict(**agent_coords, channel='chem1')] += deposit * alive
+        self.medium.loc[dict(**agent_coords, channel='chem1')] += deposit.to_numpy()
         # Layout agents onto the field
         # TODO: make not binary but 'alive' continuous
         self.medium.loc[dict(channel='agents')] = 0
-        self.medium.loc[dict(**agent_coords, channel='agents')] = alive
+        self.medium.loc[dict(**agent_coords, channel='agents')] = 1.
 
         self._log_agent.log(agent_coords['x'], 'coords[x]')
         self._log_agent.log(agent_coords['y'], 'coords[y]')
