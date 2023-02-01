@@ -104,9 +104,6 @@ class Env(gym.Env[ObsType, ActType]):
         self._agent_move(action)
         self._agent_deposit_and_layout(action)
 
-        # self._log_agent.log_update(self.agents)
-        # self._log_agent.log_nonzero(self.medium)
-
         # Lifecycle stage
         energy_gain = self._agent_feed(action)
         self._agent_lifecycle()

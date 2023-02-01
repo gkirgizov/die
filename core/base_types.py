@@ -6,7 +6,7 @@ import xarray as da
 # ActType = TypeVar('ActType')
 # ObsType = TypeVar('ObsType')
 ActType = da.DataArray
-AgtType = da.DataArray  # 1-channel array
+AgtType = da.DataArray  # n-channel 1d-array
 MediumType = da.DataArray
 ObsType = Tuple[AgtType, MediumType]
 FieldIdx = Dict[str, da.DataArray]  # pointwise indexer of MediumType

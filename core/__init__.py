@@ -53,7 +53,7 @@ Necessary core
         - [x] agent_act_on_medium will be like agents_to_medium
     - [x] add medium RANDOMIZATION of agents <-- will be resolved by previous point
           because randomization in agents is still liable to *aliasing*
-- [ ] 0.2: come up with Physarum kernel
+- [x] 0.2: come up with Physarum kernel
       some summing-up kernel that determines direction?
       like *chemical-weighted sum of coordinates*? then we get direction vector.
       ah, I see! that's like *a specific case of general convolving agent* with const-linear weigth mask!
@@ -81,18 +81,17 @@ Necessary core
             - always turning by specific amount (gradient inertia doesn't work)
       - [x] add some *native* collision resolution -- natural stochasticity of agents
 
-      - [ ] Exp check that order of operations is logical:
+      - [x] Exp check that order of operations is logical:
             - Deposit happens after medium diffuse & agent sensing & grad compute
               so that they don't sense their own trails so much.
-            - Actually, Move must happen after Deposit => sense will be more pure
-      - [ ] make agent deposit only on successfull turn
+            - Deposit happens after successful move
+      - [x] make agent deposit only on successfull turn
       - [x] create gradient + offset agent
             separate Blind zone, Discretization, Sense offset from basic GradAgent
             why? allow same gradient agent but with additional conditions
       Fixes
       - [ ] align sense mask on Medium with Agent's sense mask
-      - [ ] fix "Jittering" agents
-        h1: conflicting write to 'agents' channel with duplicate index
+      - [x] fix "Jittering" agents
 
       Experiment Log. Modifications (a-d):
 
@@ -115,22 +114,30 @@ Necessary core
           *Maybe* it is a quazi-prediction of where the food will be available?
           - [ ] EXP NOTE maybe learning agents will come up with something like that?
 
-      - [ ] setup clear Reward & performance characteristics (allmost done)
-      - [ ] setup baseline Dynamics hyperparams
-            criteria is some baseline performance of Random agent
-
 -- does that count as a paper on generalisation of original Physarum paper? making it continuous?
    how about Lenia?
    sounds like not quite; small incremental enhancement.
 
-- [ ] get some avg stats (like a reward)
-- [ ] ...
+- [ ] 0.3: basic learning
+    - [ ] design baseline Experiment:
+        - [ ] check if agents have enough pressure for learning communication
+            need dying? Reward is enough?
+        - [ ] setup clear Reward & performance characteristics (almost done)
+
+        - [ ] setup baseline Dynamics hyperparams
+            Env + base Agents + tune per avg performance
+            criteria is some baseline performance of Random agent
+        - [ ] try
+
+        - [ ] create Weather Forecast Env
+
 - [ ] test deposit with communication
 
 Important core enhancements:
 - [ ] always update position with continous data channels in `agents` array
       i.e. in coordinates store only approximations; but don't lose info on precision.
 - [ ] **implement separate 2-way mapper for such indexers**
+- [ ] dynamic parameters of Dynamics
 
 Aux: plotting
 - plotting NB: all tests are isolated visual cases, really
@@ -139,6 +146,7 @@ Aux: plotting
 - [x] subplot with agent stats
 - [ ] subplot with agent sense neighbourhoods?
 - [ ] advanced dynamic vis (see https://docs.xarray.dev/en/stable/user-guide/plotting.html)
+- [ ] dynamic parameter sliders
 
 Well packaged
 - [ ] make tests out of visual examples
@@ -159,4 +167,26 @@ Living thing 1 (Gradient coagulating agent):
 Env params:
 - higher diffuse => better communication; less diffuse => slower communication & convergence
 
+----------
+
+**Learning Experiment Setup**
+
+Environments:
+- (st-rand) static x random
+- (dyn-rand) dynamic x random
+- (dyn-pred) dynamic x predictable (function dynamics)
+- (dyn-weather) dynamic weather forecast
+- (dyn-comm) static x perlin-noise x dynamic diffusion
+Variations:
+- dynamic communication parameters (diffusion & decay change by some formula)
+
+Agents & performance
+- random (st-rand) -> negative perf
+- random (dyn-rand) -> negative perf, >= in static
+- physarum (st-rand) -> positive perf;
+- physarum (dyn-rand) -> positive perf; ~~<= in static, > random
+in random & in predictable environment
+
+
 """
+
