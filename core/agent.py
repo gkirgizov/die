@@ -123,11 +123,14 @@ class GradientAgent(Agent):
         self._prev_grad = grad
         return grad
 
+    def _process_deposit(self, agents: AgtType, sensed_food: AgtType) -> ActType:
+        return self._deposit * sensed_food
+
     def forward(self, obs: ObsType) -> ActType:
         coords = ['dx', 'dy']
         agents, medium = obs
         action = DataInitializer.init_action_for(agents)
-        idx = AgentIndexer(agents)
+        idx = AgentIndexer(medium.shape[1:], agents)
         chemical = medium.sel(channel='chem1')
 
         # Compute chemical gradient with custom processing
@@ -142,7 +145,7 @@ class GradientAgent(Agent):
         # Chemical deposit relative to discovered food
         food = medium.sel(channel='env_food')
         sensed_medium_food = idx.field_by_agents(food, only_alive=False)
-        deposit = self._deposit * sensed_medium_food
+        deposit = self._process_deposit(agents, sensed_medium_food)
 
         # Assign action
         action.loc[dict(channel=coords)] = grad_per_agent * self._scale
@@ -175,12 +178,14 @@ class PhysarumAgent(GradientAgent):
         self._sense_radians = np.radians(sense_angle)
         self._rtol = turn_tolerance
         self._direction_rads = self._discretize_grad(self._prev_grad)
+        self._deposit_mask = 1.
 
     def _discretize_grad(self, grad):
         return discretize(get_radians(grad), self._turn_radians)
 
     def _choose_turn(self, drads: np.ndarray) -> np.ndarray:
         """Chooses a turn based on delta between desired & actual direction"""
+
         # Compute delta between actual direction & chemical gradient direction
         dir_delta = self._direction_rads - drads
         dir_delta = renormalize_radians(dir_delta)
@@ -194,11 +199,14 @@ class PhysarumAgent(GradientAgent):
         rand_choice = (np.random.randint(0, 2, undetermined.shape) - 0.5) * 2
 
         # Turn right or left, except for undetermined values where random turn is made
+        dir_delta *= np.logical_not(undetermined)
         turn = rand_choice
         turn[dir_delta > atol] = -1  # right, clockwise
         turn[dir_delta < -atol] = 1 # left, counter-clockwise
-        turn[undetermined] = rand_choice[undetermined]
         turn *= self._turn_radians
+
+        # Create deposit mask so agents signal chemical only on succesful turn
+        self._deposit_mask = np.logical_not(undetermined_grad | undetermined_turn)
 
         return turn
 
@@ -216,6 +224,12 @@ class PhysarumAgent(GradientAgent):
         dr = 1. if self._normalized else dr
         grad = np.stack(polar2xy(dr, directions))
         return grad
+
+    def _process_deposit(self, agents: AgtType, sensed_food: AgtType) -> ActType:
+        mask = self._deposit_mask.clip(0.1, 1.0)  # allow minimal signaling always
+        target = sensed_food
+        # target = agents.sel(channel='agent_food')
+        return self._deposit * target * mask
 
     def _process_gradient(self, grad: np.ndarray) -> np.ndarray:
         delta_grad = self._discrete_turn(grad)

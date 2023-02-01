@@ -19,11 +19,11 @@ def try_agent_action(agent: Agent,
     food_flow = \
         WaveSequence(field_size, dt=0.01).get_flow_operator(scale=0.8, decay=1)
     env = Env(field_size, Dynamics(init_agent_ratio=agent_ratio,
-                                   # op_food_flow=food_flow,
-                                   # food_infinite=False,
-                                   food_infinite=True,
+                                   op_food_flow=food_flow,
+                                   food_infinite=False,
+                                   # food_infinite=True,
                                    apply_sense_mask=False,
-                                   diffuse_sigma=.4, rate_decay_chem=0.05,
+                                   # diffuse_sigma=.4, rate_decay_chem=0.05,
                                    ))
 
     def manual_step(action: ActType):
@@ -67,9 +67,11 @@ def try_random_agent(**kwargs):
 
 def try_gradient_agent(num_agents, **kwargs):
     agent = GradientAgent(num_agents,
-                          inertia=0.0, scale=0.01, deposit=0.5,
-                          sense_offset=0.005,
-                          noise_scale=0.01,
+                          sense_offset=0.03,
+                          inertia=0.95,
+                          scale=0.01,
+                          deposit=4.5,
+                          noise_scale=0.025,
                           normalized_grad=True)
     return agent
 
@@ -78,12 +80,12 @@ def try_physarum_agent(num_agents, **kwargs):
     agent = PhysarumAgent(num_agents,
                           turn_angle=35,
                           sense_angle=120,
-                          sense_offset=0.02,
+                          sense_offset=0.03,
                           turn_tolerance=0.05,
 
                           inertia=0.,
-                          scale=0.01,
-                          deposit=0.5,
+                          scale=0.0075,
+                          deposit=4.5,
                           noise_scale=0.0,
                           normalized_grad=True)
     return agent
@@ -97,17 +99,17 @@ if __name__ == '__main__':
 
     # field_size = 512
     # field_size = 256
-    # field_size = 156
+    field_size = 156
     # field_size = 94
     # field_size = 32
-    field_size = 12
+    # field_size = 12
     num_agents = field_size * field_size
 
     # agent = try_const_agent()
-    agent = try_random_agent()
+    # agent = try_random_agent()
     # agent = try_gradient_agent(num_agents)
-    # agent = try_physarum_agent(num_agents)
+    agent = try_physarum_agent(num_agents)
 
     try_agent_action(agent, (field_size, field_size),
-                     iters=1000, agent_ratio=0.02)
+                     iters=1000, agent_ratio=0.1)
 
