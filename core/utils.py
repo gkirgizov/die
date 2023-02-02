@@ -1,6 +1,7 @@
 import logging
 from typing import Sequence, Dict
 
+import matplotlib
 import numpy as np
 import xarray as da
 
@@ -151,3 +152,10 @@ def np_info(grad):
     return (f'shape: {np.shape(grad)}, unique: {len(np.unique(grad))}, '
             f'max: {np.max(grad).round(3)}, min: {np.min(grad).round(3)}, '
             f'avg: {np.mean(grad).round(3)}, std: {np.std(grad).round(3)}')
+
+
+def setup_logging():
+    # setup logging
+    logging.basicConfig(level=logging.INFO)
+    # disable matplotlib warnings, mabye put that into EnvDrawer
+    matplotlib.pyplot.set_loglevel('error')

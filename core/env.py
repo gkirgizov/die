@@ -41,14 +41,14 @@ def zero_cost(action: ActType) -> Array1C:
 class Dynamics:
     op_action_cost: CostOperator = linear_action_cost
     op_food_flow: FoodOperator = lambda x: x
-    rate_feed: float = 0.1  # TODO: maybe do lambda taking into account input?
+    rate_feed: float = 0.1
     rate_decay_chem: float = 0.1
     boundary: BoundaryCondition = BoundaryCondition.wrap
     diffuse_mode: str = 'wrap'
-    diffuse_sigma: float = 1.0
+    diffuse_sigma: float = .5
 
     # test options?
-    apply_sense_mask: bool = True
+    apply_sense_mask: bool = False  # TODO: align sense mask with agents offsets
     food_infinite: bool = False
     agents_die: bool = False
     agents_born: bool = False
@@ -66,8 +66,8 @@ class Env(gym.Env[ObsType, ActType]):
         self.dynamics = dynamics or Dynamics()
 
         self.medium = DataInitializer(field_size, DataChannels.medium) \
-            .with_food_perlin(threshold=1.0, octaves=4) \
             .with_const('env_food', 0.5) \
+            .with_food_perlin(threshold=1.0, octaves=8) \
             .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
 
