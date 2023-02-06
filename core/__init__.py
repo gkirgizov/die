@@ -138,6 +138,17 @@ Important core enhancements:
       i.e. in coordinates store only approximations; but don't lose info on precision.
 - [ ] **implement separate 2-way mapper for such indexers**
 - [ ] dynamic parameters of Dynamics
+- [ ] Abstracted Actionable-channels definition
+      like, let medium have channels rgbc,
+      and enable Agent to Sense 'rgb' and to Act on 'g' and 'c'.
+- [ ] Compositional Abstracted Sensors in real-world terms (?)
+      e.g. 'Rotate Sensor', 'Acceleration Sensor', 'Gradient Sensor', 'Acidity Sensor', 'Food Sensor'.
+      each sensor is defined as
+      (a) vectorized transform of some input channels
+      (b) hyperparams (like space offset and delay)
+      Why? A lot of information is too implicitly hardcoded into Env & Agent definition.
+
+**Do I have an aim of making a good framework for something like "Chemical Artificial Life GYM"?**
 
 Aux: plotting
 - plotting NB: all tests are isolated visual cases, really
