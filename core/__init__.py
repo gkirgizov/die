@@ -1,5 +1,25 @@
 
 """
+
+**Research Aims**
+- Let agents learn effective Operator dynamics of medium for prediction and their life
+- Find how agents establish communication channels
+
+**Possible Research Vectors**
+- Can prediction be temporally deep?
+-
+- Measuring system complexity through some entropic-dynamics metrics
+- Learning to Communicate:
+    - Finding correlation between medium capacity for message passing and system complexity
+    - Provisioning some potential to establish better comm channels -- like a winning strategy.
+- Learning *dynamic* model of environment
+  Pushing agent to implicitly model/predict dynamics of the medium (food,
+
+  Modeling operators ('change') instead of patterns ('things') in the world.
+  How to compare it with NNs?
+  Maybe with dynamic medium operators (diffusion/decay) that could work.
+  Agents will learn the model, while NNs will not.
+
 Plan
 - [x] Stage 0.1: const moving
 - [x] Stage 0.2: classic physarum? without feeding/dying; just moving
@@ -119,6 +139,9 @@ Necessary core
    sounds like not quite; small incremental enhancement.
 
 - [ ] 0.3: basic learning
+    - [ ] a bit better streamline stats with tqdm
+    - [ ] measure avg perf of baseline setups
+    - [ ] tweak them
     - [ ] design baseline Experiment:
         - [ ] check if agents have enough pressure for learning communication
             need dying? Reward is enough?
@@ -127,7 +150,6 @@ Necessary core
         - [ ] setup baseline Dynamics hyperparams
             Env + base Agents + tune per avg performance
             criteria is some baseline performance of Random agent
-        - [ ] try
 
         - [ ] create Weather Forecast Env
 
@@ -138,6 +160,8 @@ Important core enhancements:
       i.e. in coordinates store only approximations; but don't lose info on precision.
 - [ ] **implement separate 2-way mapper for such indexers**
 - [ ] dynamic parameters of Dynamics
+- [ ] STRICT cost action
+
 - [ ] Abstracted Actionable-channels definition
       like, let medium have channels rgbc,
       and enable Agent to Sense 'rgb' and to Act on 'g' and 'c'.
@@ -147,6 +171,10 @@ Important core enhancements:
       (a) vectorized transform of some input channels
       (b) hyperparams (like space offset and delay)
       Why? A lot of information is too implicitly hardcoded into Env & Agent definition.
+- [ ] Compositional Agents:
+      Synchronous (sequential) and async (randomly chosen) models.
+      Layered agents could act on top of other agents --- think of hierarchies of "cells"
+       that could "warp" source medium and reward function for their underlying agents.
 
 **Do I have an aim of making a good framework for something like "Chemical Artificial Life GYM"?**
 
@@ -196,8 +224,21 @@ Agents & performance
 - random (dyn-rand) -> negative perf, >= in static
 - physarum (st-rand) -> positive perf;
 - physarum (dyn-rand) -> positive perf; ~~<= in static, > random
+- gradient (st-rand) -> positive perf; >= physarum
+- gradient (dyn-rand) -> positive perf
+--> physarum must have better exploration => can test this in some specific sparse dynamic env-s
 in random & in predictable environment
 
+Target parameters for defining baseline:
+* Reward:
+- D op_action_cost
+- D rate_feed
+- D op_food_flow
+* Comm:
+- D diffusion/decay
+- A deposit
+* Couplings:
+- ...
 
 """
 
