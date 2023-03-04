@@ -49,6 +49,8 @@ class Dynamics:
 
     # test options?
     apply_sense_mask: bool = False  # TODO: align sense mask with agents offsets
+    # TODO: strict_cost
+    strict_cost: bool = True  # defines if actions with cost higher than available resource are truncated
     food_infinite: bool = False
     agents_die: bool = False
     agents_born: bool = False
@@ -119,8 +121,8 @@ class Env(gym.Env[ObsType, ActType]):
         mean_gain = reward / num_agents if num_agents > 0 else 0.
         info = {
             'num_agents': num_agents,
-            'reward': reward,
-            'mean_reward': mean_gain,
+            'reward': np.round(reward, 3),
+            'mean_reward': np.round(mean_gain, 5)
         }
         terminated = num_agents == 0
         truncated = False

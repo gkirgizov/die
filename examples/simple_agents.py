@@ -106,4 +106,5 @@ if __name__ == '__main__':
     run_experiment(field_size=156,
                    agent_id='rand',
                    dynamics_id='st-perlin',
+                   agent_ratio=0.1,
                    )
