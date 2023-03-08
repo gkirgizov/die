@@ -9,20 +9,24 @@ from core.env import Env, Dynamics
 from core.utils import setup_logging
 
 
+def _manual_step(env: Env, action: ActType):
+    """Use this manual step instead of Env.step
+    for debugging and customizing update cycle."""
+
+    # env._agent_move_async(action)
+    env._agent_move(action)
+    env._agent_deposit_and_layout(action)
+
+    env._agent_feed(action)
+    env._agent_lifecycle()
+
+    env._medium_resource_dynamics()
+    env._medium_diffuse_decay()
+
+    return env._get_current_obs, 0, False, False, {}
+
+
 def run_agent(env: Env, agent: Agent, iters=1000, show_each=1):
-
-    def manual_step(action: ActType):
-        # env._agent_move_async(action)
-        env._agent_move(action)
-        env._agent_deposit_and_layout(action)
-
-        env._agent_feed(action)
-        env._agent_lifecycle()
-
-        env._medium_resource_dynamics()
-        env._medium_diffuse_decay()
-
-        return env._get_current_obs, 0, False, False, {}
 
     total_reward = 0
     obs = env._get_current_obs
@@ -97,14 +101,17 @@ def run_experiment(field_size=156,
         'dyn-pred': Dynamics(init_agent_ratio=agent_ratio, food_infinite=False, op_food_flow=wave_flow),
     }
 
+    # Setup environment
     env = Env(field_size, dynamics_choice[dynamics_id])
+    # Setup agent
     agent = agents[agent_id]
+    # Run the agent-env loop
     run_agent(env, agent, iters=iters)
 
 
 if __name__ == '__main__':
     run_experiment(field_size=156,
-                   agent_id='rand',
+                   agent_id='physarum',
                    dynamics_id='st-perlin',
                    agent_ratio=0.1,
                    )

@@ -85,7 +85,7 @@ class Env(gym.Env[ObsType, ActType]):
         # print(color)
         color /= np.linalg.norm(color)
         self._drawer = EnvDrawer(field_size, size=6, aspect=self._get_aspect_ratio,
-                                 color_mapper=lambda rgb: np.cross(color, rgb, axisb=-1)
+                                 # color_mapper=lambda rgb: np.cross(color, rgb, axisb=-1)
                                  )
         self._drawer.show(self.medium, self.agents)  # initial show
 

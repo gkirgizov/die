@@ -154,8 +154,8 @@ def np_info(grad):
             f'avg: {np.mean(grad).round(3)}, std: {np.std(grad).round(3)}')
 
 
-def setup_logging():
+def setup_logging(level=logging.INFO):
     # setup logging
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=level)
     # disable matplotlib warnings, mabye put that into EnvDrawer
     matplotlib.pyplot.set_loglevel('error')

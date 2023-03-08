@@ -58,16 +58,16 @@ class GradientAgent(Agent):
     """
 
     def __init__(self,
-                 num_agents: int,
-                 scale: float = 1.0,
-                 deposit: float = 0.1,
-                 inertia: float = 0.5,
+                 max_agents: int = 10**6,
+                 scale: float = 0.01,
+                 deposit: float = 4.0,
+                 inertia: float = 0.9,
                  sense_offset: float = 0.,
                  noise_scale: float = 0.025,  # is measured as fraction of 'scale'
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
                  ):
-        self._size = num_agents
+        self._size = max_agents
         self._rng = np.random.default_rng()
         self._noise_scale = noise_scale
         self._scale = scale
@@ -157,19 +157,19 @@ class GradientAgent(Agent):
 
 class PhysarumAgent(GradientAgent):
     def __init__(self,
-                 num_agents: int,
+                 max_agents: int = 10**6,
                  scale: float = 0.01,
-                 deposit: float = 0.1,
-                 inertia: float = 0.5,
-                 sense_offset: float = 0.,
-                 noise_scale: float = 0.025,
+                 deposit: float = 4.0,
+                 inertia: float = 0.0,
+                 sense_offset: float = 0.01,
+                 noise_scale: float = 0.0,
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
                  turn_angle: int = 30,
                  sense_angle: int = 90,
                  turn_tolerance: float = 0.1,  # relative (to turn angle) tolerance for definite turn
                  ):
-        super().__init__(num_agents,
+        super().__init__(max_agents,
                          scale, deposit, inertia,
                          sense_offset,
                          noise_scale,
@@ -256,7 +256,7 @@ class ConstAgent(Agent):
 
 
 class RandomAgent(Agent):
-    def __init__(self, move_scale: float = 0.1, deposit_scale: float = 0.5):
+    def __init__(self, move_scale: float = 0.01, deposit_scale: float = 0.5):
         self._scale = move_scale
         self._dep_scale = deposit_scale
 
