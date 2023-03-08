@@ -5,6 +5,7 @@ from numbers import Number
 from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable, Dict
 
 import numpy as np
+from matplotlib import pyplot as plt
 from skimage import filters
 import xarray as da
 import gymnasium as gym
@@ -130,8 +131,11 @@ class Env(gym.Env[ObsType, ActType]):
         # Then goes sensory stage by Agent
         return self._get_current_obs, reward, terminated, truncated, info
 
-    def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
-        return self._drawer.draw(self.medium, self.agents)
+    def render(self, show=True) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
+        result = self._drawer.draw(self.medium, self.agents)
+        if show:
+            plt.show()
+        return result
 
     def _medium_diffuse_decay(self):
         """Applies per-channel diffusion, channel-specific."""
