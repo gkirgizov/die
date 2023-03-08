@@ -1,25 +1,25 @@
-import numpy as np
-import xarray as da
-from matplotlib import pyplot as plt
-from xarray import plot
+import time
 
-from core.base_types import ActType, ObsType, MaskType, CostOperator, DataChannels
+from matplotlib import pyplot as plt
+
+from core.base_types import DataChannels
 from core.data_init import DataInitializer
-from core.env import Env
-from core.utils import plot_medium
+from core.plotting import EnvDrawer
 
 
 def try_plot(field_size=(256, 256)):
-    medium = DataInitializer(field_size, DataChannels.medium)\
+    medium = DataInitializer(field_size, DataChannels.medium) \
         .with_food_perlin(threshold=0.5) \
         .with_chem(threshold=0.25) \
-        .build()
-    agents = DataInitializer(field_size, DataChannels.agents) \
-        .with_agents(ratio=0.05) \
-        .build()
+        .with_agents(ratio=0.15) \
+        .build(name='medium')
+    agents = DataInitializer.agents_from_medium(medium)
 
-    plot_medium(medium, agents)
+    drawer = EnvDrawer(field_size)
+    drawer.show(medium, agents)
+    drawer.draw(medium, agents)
     plt.show()
+    time.sleep(5)
 
 
 if __name__ == '__main__':
