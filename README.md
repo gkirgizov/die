@@ -1,4 +1,4 @@
-# Distributed Intelligence Environment -- *or just DIE*
+# Distributed Intelligence Environment — *or just DIE*
 
 **DIE** is an Artificial Life project aimed at reproducing emergence of distributed intelligence under environmental pressures.
 
@@ -8,7 +8,36 @@ TODO: GIF of random and physarum and gradient agents
 
 ### Quick Start
 
-TODO: two agents from GIF
+Minimal example for running an agent in the environment with default settings:
+```python
+def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=1000):
+  # Setup the environment
+  dynamics = Dynamics(init_agent_ratio=agent_ratio)
+  env = Env(field_size, dynamics)
+
+  total_reward = 0
+  obs = env._get_current_obs
+  for i in (pbar := tqdm.trange(iters)):
+    # Step: action & observation
+    action = agent.forward(obs)
+    obs, reward, _, _, stats = env.step(action)
+    total_reward += reward
+    # Visualisation & logging
+    pbar.set_postfix(total_reward=np.round(total_reward, 3))
+    env.render(show=True)
+```
+
+To reproduce the GIF-s above you can run it with following agents:
+```python
+run_minimal(RandomAgent(move_scale=0.01))
+
+run_minimal(PhysarumAgent(max_agents=256*256,
+                          scale=0.01,
+                          turn_angle=30,
+                          sense_offset=0.03))
+```
+
+More example, including this one, can be found in `examples` directory.
 
 ### Features
 
