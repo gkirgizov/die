@@ -136,7 +136,7 @@ class EnvDrawer:
             artist = ax.imshow(img)
             self._artists.append(artist)
 
-    def draw(self, medium: MediumType, agents: AgtType):
+    def update(self, medium: MediumType, agents: AgtType):
         if not self._artists:
             raise ValueError("First call initial `show` for initialising images.")
 
@@ -144,6 +144,8 @@ class EnvDrawer:
             img = drawer(medium, agents)
             artist.set_data(img)
 
+    def draw(self, medium: MediumType, agents: AgtType):
+        self.update(medium, agents)
         # TODO: add consideration of 'is_visible'
         plt.draw()
         plt.pause(0.01)

@@ -11,6 +11,9 @@ MediumType = da.DataArray
 ObsType = Tuple[AgtType, MediumType]
 FieldIdx = Dict[str, da.DataArray]  # pointwise indexer of MediumType
 
+ActionFunc = Callable[[ObsType], ActType]
+
+
 Array = Union[np.ndarray, da.DataArray]
 Array1C = Array  # Single-channel 2D array
 MaskType = Array1C

@@ -6,12 +6,13 @@ from typing import Optional, Union, List, Tuple, TypeVar, Sequence, Hashable, Di
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
 from skimage import filters
 import xarray as da
 import gymnasium as gym
 
 from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperator, AgtType, MediumType, FoodOperator, \
-    Array1C
+    Array1C, ActionFunc
 from core.data_init import DataInitializer
 from core import utils
 from core.plotting import EnvDrawer
@@ -136,6 +137,26 @@ class Env(gym.Env[ObsType, ActType]):
         if show:
             plt.show()
         return result
+
+    def render_animation(self,
+                         action_function: ActionFunc,
+                         filename: Optional[str] = None,
+                         num_frames: int = 100) -> FuncAnimation:
+        """Return matplotlib's animation and optionally saves it to a file."""
+        def frame_step(frame):
+            action = action_function(self._get_current_obs)
+            self.step(action)
+            self._drawer.update(self.medium, self.agents)
+
+        animate = FuncAnimation(
+            fig=self._drawer.fig,
+            func=frame_step,
+            save_count=num_frames,
+            interval=20,
+        )
+        if filename:
+            animate.save(filename, fps=60, dpi=200)
+        return animate
 
     def _medium_diffuse_decay(self):
         """Applies per-channel diffusion, channel-specific."""
