@@ -7,10 +7,11 @@ from core.utils import setup_logging
 
 def record(agent: Agent,
            field_size=(256, 256),
-           iters=300,
+           iters=200,
            save_dir='samples',
            **dynamics_params):
-    filepath = Path(save_dir) / agent.__class__.__name__
+    filename = f'{agent.__class__.__name__}.gif'
+    filepath = Path(save_dir) / filename
     print('Starting animation...')
 
     env = Env(field_size, Dynamics(**dynamics_params))
@@ -27,7 +28,7 @@ if __name__ == '__main__':
     record(random_agent, field_size, init_agent_ratio=0.05)
 
     physarum_agent = PhysarumAgent(max_agents=max_agents,
-                                   scale=0.01,
+                                   scale=0.007,
                                    turn_angle=30,
-                                   sense_offset=0.03)
+                                   sense_offset=0.04)
     record(physarum_agent, field_size, init_agent_ratio=0.15)

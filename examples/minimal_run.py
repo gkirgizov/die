@@ -30,10 +30,10 @@ if __name__ == '__main__':
     setup_logging(logging.WARNING)
 
     random_agent = RandomAgent(move_scale=0.01)
-    run_minimal(random_agent, agent_ratio=0.05, iters=300)
+    run_minimal(random_agent, agent_ratio=0.05, iters=200)
 
     physarum_agent = PhysarumAgent(max_agents=256*256,
-                                   scale=0.01,
+                                   scale=0.006,
                                    turn_angle=30,
-                                   sense_offset=0.03)
-    run_minimal(physarum_agent, agent_ratio=0.15, iters=300)
+                                   sense_offset=0.04)
+    run_minimal(physarum_agent, agent_ratio=0.15, iters=200)

@@ -158,10 +158,10 @@ class GradientAgent(Agent):
 class PhysarumAgent(GradientAgent):
     def __init__(self,
                  max_agents: int = 10**6,
-                 scale: float = 0.01,
+                 scale: float = 0.005,
                  deposit: float = 4.0,
                  inertia: float = 0.0,
-                 sense_offset: float = 0.01,
+                 sense_offset: float = 0.03,
                  noise_scale: float = 0.0,
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
