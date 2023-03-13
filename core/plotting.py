@@ -1,6 +1,7 @@
-from typing import Tuple, Optional, Callable
+from typing import Tuple, Optional, Callable, Union
 
 import numpy as np
+import matplotlib.cm as cm
 from matplotlib import pyplot as plt
 
 from core.base_types import MediumType, AgtType
@@ -29,24 +30,40 @@ class FieldTrace:
 
 
 class EnvDrawer:
+
+    field_colors = {
+        'rgb': None,
+        'one': [0.19, -0.3, 0.74],
+        'two': [-0.45, 0.65, 0.83],
+        'random': None,
+    }
+
     def __init__(self,
                  field_size: Tuple[int, int],
                  size: float = 6,
                  aspect: float = 1.0,
-                 with_grid_agents=False,
-                 color_mapper: Optional[Callable] = None):
+                 with_grid_agents: bool = False,
+                 is_trace_colored: bool = True,
+                 field_colors_id: str = 'rgb'):
+        self._is_trace_colored = is_trace_colored
+        self._rgb_mapper = self._set_colors(field_colors_id)
+
         # Setup figure with subplots
         figheight = size
         figwidth = size * aspect
+        # 4-grid
         figsize = (figwidth * 2, figheight * 2)
         self.fig, axs = plt.subplots(nrows=2, ncols=2, figsize=figsize,
                                      gridspec_kw={'width_ratios': [1, 1],
                                                   'height_ratios': [1, 1]})
         self.fig.tight_layout()
-        self._rgb_mapper = color_mapper or (lambda rgba: rgba)
+        (medium_ax, trace_ax), (agent_ax, spare_ax) = axs
+        # Single-row
+        # figsize = (figwidth * 2, figheight)
+        # self.fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsize)
+        # (medium_ax, trace_ax) = axs
 
         self.field_size = field_size
-        (medium_ax, trace_ax), (agent_ax, spare_ax) = axs
         self._agent_trace = FieldTrace(field_size)
         self._disable_ticks(medium_ax)
         self._disable_ticks(trace_ax)
@@ -60,8 +77,24 @@ class EnvDrawer:
             (spare_ax, self._upd_img_dummy),
         ]
         self._artists = []
-        # self.cmap = 'viridis'
         plt.ion()
+
+    @staticmethod
+    def _set_colors(field_colors_id) -> Callable:
+        if field_colors_id == 'random':
+            color = (np.random.random(3) - 0.5) * 2
+        else:
+            color = EnvDrawer.field_colors.get(field_colors_id)
+        if color is not None:
+            color /= np.linalg.norm(color)
+            rgb_mapper=lambda rgb: np.cross(color, rgb, axisb=-1)
+        else:
+            rgb_mapper=lambda rgb: rgb
+        return rgb_mapper
+
+    @staticmethod
+    def _colorify(monochrome_data: np.array, cmap: str ='gray'):
+        return cm.get_cmap(cmap)(monochrome_data)
 
     def _disable_ticks(self, ax: plt.Axes, with_grid: bool = False):
         width, height = self.field_size
@@ -100,13 +133,11 @@ class EnvDrawer:
     def _upd_img_trace(self, medium: MediumType, agents: AgtType) -> np.ndarray:
         self._agent_trace.update(medium.sel(channel='agents'))
         trace_channel = self._agent_trace.as_mask()
-        ones_channel = np.ones(self.img_shape)
-        data_rgb = np.stack([trace_channel,
-                             trace_channel,
-                             trace_channel,
-                             ones_channel,
-                             ], axis=-1)
-        return data_rgb
+
+        cmap_id = 'magma' if self._is_trace_colored else 'gray'
+        trace_colored = self._colorify(trace_channel, cmap_id)
+
+        return trace_colored
 
     def _upd_img_agents(self, medium: MediumType, agents: AgtType) -> np.ndarray:
         """Returns RGB/RGBA image ready for imshow"""

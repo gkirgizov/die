@@ -81,14 +81,8 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.buffer_medium = self.medium.copy(deep=True)
 
-        color = [0.19, -0.3, 0.74]
-        color = [-0.45, 0.65, 0.83]
-        # color = (np.random.random(3) - 0.5) * 2
-        # print(color)
-        color /= np.linalg.norm(color)
         self._drawer = EnvDrawer(field_size, size=6, aspect=self._get_aspect_ratio,
-                                 # color_mapper=lambda rgb: np.cross(color, rgb, axisb=-1)
-                                 )
+                                 field_colors_id='rgb')
         self._drawer.show(self.medium, self.agents)  # initial show
 
         self._log_agent = ChannelLogger(self.agents, channels=['x', 'y'], num=self._num_alive_agents)
