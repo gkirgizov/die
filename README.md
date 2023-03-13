@@ -4,7 +4,13 @@
 
 It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium) environment** with essential pressures for foraging, feeding, *not-dying*, together with **distributed agents** for solving it.
 
-TODO: GIF of random and physarum and gradient agents
+Below you can see 2 examples of agents running in the environment: Brownian (random) and Physarum.
+
+![Brownian motion agent](img/RandomAgent.gif "Brownian motion agent animation")
+Left pane shows environment with food (green), agents (red) and their pheromone (blue). Right pane shows only movement traces of the agents. You can see that in time agents gradually consume the food.
+
+![Physarum agent](img/PhysarumAgent.gif "Physarum agent animation")
+This is a physarum (slime mold) agent that communicates found food by releasing the pheromone and moves towards zones with more pheromone. Thanks to this information sharing between particles Physarum agent is much more efficient than Brownian agent in finding and consuming food.
 
 ### Quick Start
 
@@ -32,9 +38,9 @@ To reproduce the GIF-s above you can run it with following agents:
 run_minimal(RandomAgent(move_scale=0.01))
 
 run_minimal(PhysarumAgent(max_agents=256*256,
-                          scale=0.01,
+                          scale=0.007,
                           turn_angle=30,
-                          sense_offset=0.03))
+                          sense_offset=0.04))
 ```
 
 More example, including this one, can be found in `examples` directory.
