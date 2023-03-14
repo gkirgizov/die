@@ -1,8 +1,10 @@
 # Distributed Intelligence Environment — *or just DIE*
 
-**DIE** is an Artificial Life project aimed at reproducing emergence of distributed intelligence under environmental pressures.
+**DIE** is an Artificial Life project aimed at reproducing emergence of distributed intelligence under environmental pressures using learning cellular automata models.
 
-It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium) environment** with essential pressures for foraging, feeding, *not-dying*, together with **distributed agents** for solving it. Agents are *cooperative* (share the policy), environment is *continuous* in observation and action spaces, and computations are *vectorized* over agents for efficiency.
+----
+
+It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium) environment** with essential pressures for foraging, feeding, *not-dying*, together with **distributed agents** for solving it. Agents are a kind of learning cellular automata, hence they're *cooperative* (share the policy), observation and action spaces are *continuous*, and computations are *vectorized* for efficiency.
 
 Here how 2 agents look like running in the environment: simulating *brownian motion* and *slime mold* behavior.
 
