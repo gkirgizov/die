@@ -28,6 +28,26 @@ Plan
 - [ ] Stage 0.4: RL
 - [ ] Stage 0.5: FEP
 
+Publish
+- [x] Readme ;; add research aims?
+- [x] make minimal example
+- [x] GIF demo with Starting code for gifs
+- [ ] make Env the gym.Env
+- [ ] few tests & CI
+- [ ] **Resolve question with multi-agent interface??**
+fixes for usability
+- [x] color plotting
+- [ ] max_agents in agents must be broadcastable with env medium (cut size)
+- [ ] return stats properly in a final dict; not in logging (tqdm err-s)
+Concept:
+- [ ] Resolve & put to README: is it single-agent env? is it multi-agent? single-agent distributed? can I have multi-agent env here?
+    - see: https://pettingzoo.farama.org/api/parallel/
+    - also: https://docs.ray.io/en/latest/rllib/rllib-env.html#multi-agent-and-hierarchical --- this API seems appropriate.
+      It's like we have {agent_id -> policy} mappings,
+      in default case I have trivial mapping with only one policy,
+      in multi-agent setting I can have different agents with their own policies.
+    - Well, I have continuous, homogeneous & cooperative (shared-policy), vectorized agents and environment.
+
 Necessary core
 - [x] some basic data init ENVs per channels for tests YET minimal
 - [x] test data init: plot channels
@@ -156,6 +176,7 @@ Necessary core
 - [ ] test deposit with communication
 
 Important core enhancements:
+- [ ] add asynchronous setting to Env/Agent (random portion of agents moving)
 - [ ] always update position with continous data channels in `agents` array
       i.e. in coordinates store only approximations; but don't lose info on precision.
 - [ ] **implement separate 2-way mapper for such indexers**
