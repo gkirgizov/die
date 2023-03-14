@@ -255,7 +255,7 @@ class ConstAgent(Agent):
         # return self.postprocess_action(agents, action)
 
 
-class RandomAgent(Agent):
+class BrownianAgent(Agent):
     def __init__(self, move_scale: float = 0.01, deposit_scale: float = 0.5):
         self._scale = move_scale
         self._dep_scale = deposit_scale

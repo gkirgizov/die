@@ -52,29 +52,30 @@ class EnvDrawer:
         figheight = size
         figwidth = size * aspect
         # 4-grid
-        figsize = (figwidth * 2, figheight * 2)
-        self.fig, axs = plt.subplots(nrows=2, ncols=2, figsize=figsize,
-                                     gridspec_kw={'width_ratios': [1, 1],
-                                                  'height_ratios': [1, 1]})
-        self.fig.tight_layout()
-        (medium_ax, trace_ax), (agent_ax, spare_ax) = axs
+        # figsize = (figwidth * 2, figheight * 2)
+        # self.fig, axs = plt.subplots(nrows=2, ncols=2, figsize=figsize,
+        #                              gridspec_kw={'width_ratios': [1, 1],
+        #                                           'height_ratios': [1, 1]})
+        # (medium_ax, trace_ax), (agent_ax, spare_ax) = axs
         # Single-row
-        # figsize = (figwidth * 2, figheight)
-        # self.fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsize)
-        # (medium_ax, trace_ax) = axs
+        figsize = (figwidth * 2, figheight)
+        self.fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsize)
+        (medium_ax, trace_ax) = axs
+
+        self.fig.tight_layout()
 
         self.field_size = field_size
         self._agent_trace = FieldTrace(field_size)
         self._disable_ticks(medium_ax)
         self._disable_ticks(trace_ax)
-        self._disable_ticks(agent_ax, with_grid=with_grid_agents)
-        self._disable_ticks(spare_ax)
+        # self._disable_ticks(agent_ax, with_grid=with_grid_agents)
+        # self._disable_ticks(spare_ax)
 
         self._drawers = [
             (medium_ax, self._upd_img_medium),
-            (agent_ax, self._upd_img_agents),
+            # (agent_ax, self._upd_img_agents),
             (trace_ax, self._upd_img_trace),
-            (spare_ax, self._upd_img_dummy),
+            # (spare_ax, self._upd_img_dummy),
         ]
         self._artists = []
         plt.ion()

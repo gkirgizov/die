@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm, trange
 
-from core.agent import Agent, RandomAgent, PhysarumAgent
+from core.agent import Agent, BrownianAgent, PhysarumAgent
 from core.env import Env, Dynamics
 from core.utils import setup_logging
 
@@ -29,7 +29,7 @@ def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=1000
 if __name__ == '__main__':
     setup_logging(logging.WARNING)
 
-    random_agent = RandomAgent(move_scale=0.01)
+    random_agent = BrownianAgent(move_scale=0.01)
     run_minimal(random_agent, agent_ratio=0.05, iters=200)
 
     physarum_agent = PhysarumAgent(max_agents=256*256,

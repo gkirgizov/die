@@ -2,7 +2,7 @@
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from core.agent import ConstAgent, Agent, RandomAgent, GradientAgent, PhysarumAgent
+from core.agent import ConstAgent, Agent, BrownianAgent, GradientAgent, PhysarumAgent
 from core.base_types import ActType
 from core.data_init import WaveSequence
 from core.env import Env, Dynamics
@@ -49,7 +49,7 @@ def try_const_agent(**kwargs):
 
 
 def try_random_agent(**kwargs):
-    return RandomAgent(move_scale=0.01, deposit_scale=0.1)
+    return BrownianAgent(move_scale=0.01, deposit_scale=0.1)
 
 
 def try_gradient_agent(num_agents, **kwargs):

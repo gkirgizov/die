@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from core.agent import RandomAgent, PhysarumAgent, Agent
+from core.agent import BrownianAgent, PhysarumAgent, Agent
 from core.env import Env, Dynamics
 from core.utils import setup_logging
 
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     field_size = (256, 256)
     max_agents = field_size[0] * field_size[1]
 
-    random_agent = RandomAgent(move_scale=0.01)
+    random_agent = BrownianAgent(move_scale=0.01)
     record(random_agent, field_size, init_agent_ratio=0.05)
 
     physarum_agent = PhysarumAgent(max_agents=max_agents,
