@@ -2,21 +2,21 @@
 
 **DIE** is an Artificial Life project aimed at reproducing emergence of distributed intelligence under environmental pressures.
 
-It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium) environment** with essential pressures for foraging, feeding, *not-dying*, together with **distributed agents** for solving it.
+It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium) environment** with essential pressures for foraging, feeding, *not-dying*, together with **distributed agents** for solving it. Agents are *cooperative* (share the policy), environment is *continuous* in observation and action spaces, and computations are *vectorized* over agents for efficiency.
 
-Below you can see 2 examples of agents running in the environment: Brownian (random) and Physarum.
+Here how 2 agents look like running in the environment: simulating *brownian motion* and *slime mold* behavior.
 
 ![Brownian motion agent](img/RandomAgent.gif "Brownian motion agent animation")
 Left pane shows environment with food (green), agents (red) and their pheromone (blue). Right pane shows only movement traces of the agents. You can see that in time agents gradually consume the food.
 
 ![Physarum agent](img/PhysarumAgent.gif "Physarum agent animation")
-This is a physarum (slime mold) agent that communicates found food by releasing the pheromone and moves towards zones with more pheromone. Thanks to this information sharing between particles Physarum agent is much more efficient than Brownian agent in finding and consuming food.
+This is a Physarum (slime mold) agent that communicates found food by releasing the pheromone and moves towards zones with more pheromone. Thanks to this information sharing between particles Physarum agent is much more efficient than Brownian agent in finding and consuming food.
 
 ### Quick Start
 
 Minimal example for running an agent in the environment with default settings:
 ```python
-def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=1000):
+def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=300):
   # Setup the environment
   dynamics = Dynamics(init_agent_ratio=agent_ratio)
   env = Env(field_size, dynamics)
@@ -35,7 +35,7 @@ def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=1000
 
 To reproduce the GIF-s above you can run it with following agents:
 ```python
-run_minimal(RandomAgent(move_scale=0.01))
+run_minimal(BrownianAgent(move_scale=0.01))
 
 run_minimal(PhysarumAgent(max_agents=256*256,
                           scale=0.007,
@@ -50,9 +50,10 @@ More example, including this one, can be found in `examples` directory.
 - **Artificial Life system** with environmental pressures and agents' needs.
 - **Natural rewards** for effective feeding and staying alive.
 - **Gym environment** in the format of multi-channel 2D data arrays. Agents can sense (read) certain channels and can act (write to) other channels.
-- **Agent implementations** for Physarum, Gradient, Constant, and Random behaviors.
+- **Agent implementations** for Physarum, Gradient, Constant, and Brownian motion behaviors.
 - **Controlled dynamics** of the environment.
 - **Dynamic visualisation** of environments (see GIFs above).
+- (TBD) *Learning agents*.
 - (TBD) *Flexible environment builder* with arbitrary data channels.
 - (TBD) *Easily reproducible experiments* thanks to saving & loading of experiment setup (all parameters of environments & agents)
 
@@ -73,7 +74,7 @@ The project embodies several sources of inspiration:
 
 ### Milestones
 
-1. [x] Basic environment with Random agent.
+1. [x] Basic environment with Brownian motion agent.
 2. [x] Physarum agent.
 3. [ ] Neural Cellular Automata agent based on evolutionary approach.
 4. [ ] Neural Cellular Automata agent based on Active Inference. 
