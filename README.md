@@ -8,7 +8,7 @@ It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium
 
 Here how 2 agents look like running in the environment: simulating *brownian motion* and *slime mold* behavior.
 
-![Brownian motion agent](img/RandomAgent.gif "Brownian motion agent animation")
+![Brownian motion agent](img/BrownianAgent.gif "Brownian motion agent animation")
 Left pane shows environment with food (green), agents (red) and their pheromone (blue). Right pane shows only movement traces of the agents. You can see that in time agents gradually consume the food.
 
 ![Physarum agent](img/PhysarumAgent.gif "Physarum agent animation")
