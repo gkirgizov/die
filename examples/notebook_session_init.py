@@ -1,12 +1,9 @@
 import numpy as np
 import xarray as da
-from xarray import plot
 from matplotlib import pyplot as plt
 
-from core.base_types import ActType, ObsType, MaskType, CostOperator, DataChannels
+from core.base_types import DataChannels
 from core.data_init import DataInitializer
-from core.env import Env
-from core.agent import Agent
 from core.plotting import EnvDrawer
 
 

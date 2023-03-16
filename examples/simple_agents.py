@@ -2,7 +2,7 @@
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from core.agent import ConstAgent, Agent, BrownianAgent, GradientAgent, PhysarumAgent
+from core.agent.static import ConstAgent, Agent, BrownianAgent, GradientAgent, PhysarumAgent
 from core.base_types import ActType
 from core.data_init import WaveSequence
 from core.env import Env, Dynamics

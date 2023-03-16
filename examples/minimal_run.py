@@ -1,10 +1,9 @@
 import logging
 
 import numpy as np
-from matplotlib import pyplot as plt
-from tqdm import tqdm, trange
+from tqdm import trange
 
-from core.agent import Agent, BrownianAgent, PhysarumAgent
+from core.agent.static import Agent, BrownianAgent, PhysarumAgent
 from core.env import Env, Dynamics
 from core.utils import setup_logging
 
