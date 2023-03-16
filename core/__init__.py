@@ -32,6 +32,7 @@ Publish
 - [x] Readme ;; add research aims?
 - [x] make minimal example
 - [x] GIF demo with Starting code for gifs
+- [ ] compress gifs
 - [ ] make Env the gym.Env
 - [ ] few tests & CI
 - [ ] **Resolve question with multi-agent interface??**
