@@ -7,7 +7,7 @@ from core.utils import setup_logging
 
 def record(agent: Agent,
            field_size=(256, 256),
-           iters=200,
+           iters=150,
            save_dir='samples',
            **dynamics_params):
     filename = f'{agent.__class__.__name__}.gif'
@@ -21,7 +21,7 @@ def record(agent: Agent,
 
 if __name__ == '__main__':
     setup_logging()
-    field_size = (256, 256)
+    field_size = (196, 196)
     max_agents = field_size[0] * field_size[1]
 
     random_agent = BrownianAgent(move_scale=0.01)

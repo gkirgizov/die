@@ -81,7 +81,7 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.buffer_medium = self.medium.copy(deep=True)
 
-        self._drawer = EnvDrawer(field_size, size=6, aspect=self._get_aspect_ratio,
+        self._drawer = EnvDrawer(field_size, size=5, aspect=self._get_aspect_ratio,
                                  field_colors_id='rgb')
         self._drawer.show(self.medium, self.agents)  # initial show
 
@@ -146,10 +146,10 @@ class Env(gym.Env[ObsType, ActType]):
             fig=self._drawer.fig,
             func=frame_step,
             save_count=num_frames,
-            interval=20,
+            interval=40,
         )
         if filename:
-            animate.save(filename, fps=60, dpi=200)
+            animate.save(filename, fps=10, dpi=100)
         return animate
 
     def _medium_diffuse_decay(self):
