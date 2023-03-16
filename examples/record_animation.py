@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from core.agent.static import BrownianAgent, PhysarumAgent, Agent
+from core.agent.static import BrownianAgent
+from core.agent.gradient import PhysarumAgent
+from core.agent.base import Agent
 from core.env import Env, Dynamics
 from core.utils import setup_logging
 

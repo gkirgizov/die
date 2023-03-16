@@ -3,7 +3,9 @@ import logging
 import numpy as np
 from tqdm import trange
 
-from core.agent.static import Agent, BrownianAgent, PhysarumAgent
+from core.agent.static import BrownianAgent
+from core.agent.gradient import PhysarumAgent
+from core.agent.base import Agent
 from core.env import Env, Dynamics
 from core.utils import setup_logging
 
