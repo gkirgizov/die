@@ -11,8 +11,8 @@ from core.data_init import DataInitializer
 from core.utils import AgentIndexer
 
 
-class EvoModel(nn.Module):
-    """Model for agent learning using Evolutionary Strategies"""
+class ConvolutionModel(nn.Module):
+    """Model for agent perception based on convolution kernels."""
 
     def __init__(self,
                  kernel_sizes: Sequence[int] = (3,),
@@ -59,6 +59,7 @@ class EvoModel(nn.Module):
             for in_chans, kernel_size, out_chans
             in zip(input_channels, kernel_sizes, kernel_channels)
         ]
+        # TODO: add fully connected (ie channel info exchange) before final output
         # NB: notice the last activation function
         # for normalizing the outputs into [0,1] range
         kernels.append(nn.Sigmoid())
@@ -77,18 +78,19 @@ class EvoModel(nn.Module):
         return sense_transform
 
 
-class EvoAgent(Agent):
-    """Agent learning using Evolutionary Strategies"""
+class NeuralAutomataAgent(Agent, nn.Module):
+    """Agent with action mapping based on a neural model."""
     def __init__(self,
                  model: Optional[nn.Module] = None,
                  scale: float = 0.1,
                  deposit: float = 1.0,
                  ):
-        self._model = model or EvoModel()
+        self.model = model or ConvolutionModel()
         # And these are coefficients for later scaling in forward() step
         # self.actions_coefs = np.array(Actions.channel_ranges()[1])
         self.action_coefs = th.tensor([scale, scale, deposit])
         assert len(self.action_coefs) == len(DataChannels.actions)
+        super().__init__()
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
@@ -98,7 +100,7 @@ class EvoAgent(Agent):
 
         # Call internal tensor model
         sense_input_tensor = th.as_tensor(sense_input.values)
-        sense_transform_tensor = self._model(sense_input_tensor)
+        sense_transform_tensor = self.model(sense_input_tensor)
         sense_transform = xa.DataArray(data=sense_transform_tensor.numpy(),
                                        coords=medium.coords)
 
@@ -106,6 +108,6 @@ class EvoAgent(Agent):
         per_agent_output = idx.field_by_agents(sense_transform, only_alive=False)
         # Rescale output actions
         per_agent_output *= self.action_coefs
-        # Bulid action XArray
+        # Build action XArray
         action = DataInitializer.init_action_for(agents, per_agent_output)
         return action
