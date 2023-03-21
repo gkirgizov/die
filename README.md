@@ -9,9 +9,11 @@ It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium
 Here how 2 agents look like running in the environment: simulating *brownian motion* and *slime mold* behavior.
 
 ![Brownian motion agent](img/BrownianAgent.gif "Brownian motion agent animation")
+
 Left pane shows environment with food (green), agents (red) and their pheromone (blue). Right pane shows only movement traces of the agents. You can see that in time agents gradually consume the food.
 
 ![Physarum agent](img/PhysarumAgent.gif "Physarum agent animation")
+
 This is a Physarum (slime mold) agent that communicates found food by releasing the pheromone and moves towards zones with more pheromone. Thanks to this information sharing between particles Physarum agent is much more efficient than Brownian agent in finding and consuming food.
 
 ### Quick Start
