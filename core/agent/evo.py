@@ -4,9 +4,10 @@ import numpy as np
 import torch as th
 import xarray as xa
 from torch import nn
+from torch.nn.init import xavier_uniform
 
 from core.agent.base import Agent
-from core.base_types import ActType, ObsType, DataChannels
+from core.base_types import ActType, ObsType, DataChannels, MediumType
 from core.data_init import DataInitializer
 from core.utils import AgentIndexer
 
@@ -69,10 +70,15 @@ class ConvolutionModel(nn.Module):
         # Final model
         self.kernels = nn.Sequential(*kernels)
 
+    def init_weights(self):
+        for kernel in self.kernels:
+            if hasattr(kernel, 'weight'):
+                xavier_uniform(kernel.weight)
+
     def forward(self, input: th.Tensor) -> th.Tensor:
         sense_transform = self.kernels(input)
         # NB: dropout can have no effect if it drops only dead cells
-        output_shape = input.shape[1:]
+        output_shape = input.shape[2:]
         dropout_mask = self.agent_dropout(th.ones(output_shape))
         sense_transform *= dropout_mask
         return sense_transform
@@ -93,20 +99,16 @@ class NeuralAutomataAgent(Agent, nn.Module):
                                       num_act_channels=len(DataChannels.actions),
                                       **model_kwargs)
         # And these are coefficients for later scaling in forward() step
-        # self.actions_coefs = np.array(Actions.channel_ranges()[1])
-        self.action_coefs = th.tensor([scale, scale, deposit])
-        assert len(self.action_coefs) == len(DataChannels.actions)
+        self.action_coefs = np.array([scale, scale, deposit]).reshape((-1, 1))
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
         idx = AgentIndexer(medium.shape[1:], agents)
-        sense_input: xa.DataArray = medium.sel(channel=self.obs_channels)
 
-        # Call internal tensor model
-        sense_input_tensor = th.as_tensor(sense_input.values)
+        # Transform to Tensor, call internal tensor model, transform back to XArray
+        sense_input_tensor = self._medium2tensor(medium)
         sense_transform_tensor = self.model(sense_input_tensor)
-        sense_transform = xa.DataArray(data=sense_transform_tensor.numpy(),
-                                       coords=medium.coords)
+        sense_transform = self._tensor2medium(medium, sense_transform_tensor)
 
         # Get per-agent actions from sensed environment transformed by reception model
         per_agent_output = idx.field_by_agents(sense_transform, only_alive=False)
@@ -115,3 +117,24 @@ class NeuralAutomataAgent(Agent, nn.Module):
         # Build action XArray
         action = DataInitializer.init_action_for(agents, per_agent_output)
         return action
+
+    def _medium2tensor(self, medium: MediumType) -> th.Tensor:
+        # Select required channels
+        sense_input: xa.DataArray = medium.sel(channel=self.obs_channels)
+        # Build Tensor with the shape in torch format:
+        # (channels, width, height)
+        sense_input_tensor = th.as_tensor(sense_input.values, dtype=th.float32)
+            # .movedim([0, 1, 2], [2, 0, 1])
+        # Workaround: reshape to 4D tensor for 'circular' padding
+        # details: https://codesti.com/issue/pytorch/pytorch/95320
+        shape4d = (1, *sense_input_tensor.shape)
+        sense_input_tensor = th.reshape(sense_input_tensor, shape4d)
+        return sense_input_tensor
+
+    def _tensor2medium(self, input_medium: MediumType, tensor: th.Tensor) -> MediumType:
+        # Strip extra dims and reshape back to internal format:
+        # (channels, width, height) -> (width, height, channels)
+        tensor = tensor.squeeze() #.movedim([0, 1, 2], [1, 2, 0])
+        # sense_transform = xa.DataArray(data=tensor, coords=input_medium.coords)
+        sense_transform = xa.DataArray(data=tensor.detach().numpy(), coords=input_medium.coords)
+        return sense_transform
