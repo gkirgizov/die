@@ -15,6 +15,8 @@ class ConvolutionModel(nn.Module):
     """Model for agent perception based on convolution kernels."""
 
     def __init__(self,
+                 num_obs_channels: int = 3,
+                 num_act_channels: int = 3,
                  kernel_sizes: Sequence[int] = (3,),
                  boundary: str = 'circular',
                  p_agent_dropout: float = 0.5,
@@ -35,16 +37,15 @@ class ConvolutionModel(nn.Module):
           means properly setup obs_shape etc. data for Env
         - Use generic NEProblem class with simple eval
         """
-
         # TODO: agents should have access to their own resource stock
 
+        super().__init__()
         # Determine kernel sizes:
         # - First apply kernels preserving obs shape
         # - Lastly apply the kernel mapping convolved features to actions
-        num_obs_chans = len(DataChannels.medium)
         num_kernels = len(kernel_sizes)
-        input_channels = [num_obs_chans] * num_kernels
-        kernel_channels = [num_obs_chans] * (num_kernels-1) + [len(DataChannels.actions)]
+        input_channels = [num_obs_channels] * num_kernels
+        kernel_channels = [num_obs_channels] * (num_kernels-1) + [num_act_channels]
 
         # TODO: do I do some sample eg from Normal distrib? or deterministic policy?
         kernels = [
@@ -67,7 +68,6 @@ class ConvolutionModel(nn.Module):
         self.agent_dropout = nn.Dropout(p=p_agent_dropout)
         # Final model
         self.kernels = nn.Sequential(*kernels)
-        super().__init__()
 
     def forward(self, input: th.Tensor) -> th.Tensor:
         sense_transform = self.kernels(input)
@@ -81,22 +81,26 @@ class ConvolutionModel(nn.Module):
 class NeuralAutomataAgent(Agent, nn.Module):
     """Agent with action mapping based on a neural model."""
     def __init__(self,
-                 model: Optional[nn.Module] = None,
                  scale: float = 0.1,
                  deposit: float = 1.0,
+                 with_agent_channel: bool = True,
+                 **model_kwargs,
                  ):
-        self.model = model or ConvolutionModel()
+        super().__init__()
+        self.obs_channels = list(DataChannels.medium) \
+            if with_agent_channel else list(DataChannels.medium[1:])
+        self.model = ConvolutionModel(num_obs_channels=len(self.obs_channels),
+                                      num_act_channels=len(DataChannels.actions),
+                                      **model_kwargs)
         # And these are coefficients for later scaling in forward() step
         # self.actions_coefs = np.array(Actions.channel_ranges()[1])
         self.action_coefs = th.tensor([scale, scale, deposit])
         assert len(self.action_coefs) == len(DataChannels.actions)
-        super().__init__()
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
         idx = AgentIndexer(medium.shape[1:], agents)
-        sensed_channels = ('env_food', 'chem1')
-        sense_input: xa.DataArray = medium.sel(channel=sensed_channels)
+        sense_input: xa.DataArray = medium.sel(channel=self.obs_channels)
 
         # Call internal tensor model
         sense_input_tensor = th.as_tensor(sense_input.values)

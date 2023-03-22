@@ -40,7 +40,8 @@ def run_agent(env: Env,
         network_eval_func=run_epoch,
         initial_bounds=[-0.2, 0.2],
         # device='cuda:0',
-        num_actors='max',
+        # num_actors='max',
+        num_actors=1,
     )
 
     searcher = CMAES(
@@ -90,8 +91,8 @@ def run_experiment(field_size=156,
     # Setup environment
     env = Env(field_size, dynamics_choice[dynamics_id])
     # Setup agent
-    agent = NeuralAutomataAgent(ConvolutionModel(kernel_sizes=[3, 3],
-                                                 p_agent_dropout=0.25))
+    agent = NeuralAutomataAgent(kernel_sizes=[3, 3],
+                                p_agent_dropout=0.25)
     # Run the agent-env loop
     run_agent(env, agent, epochs, epoch_iters)
 
