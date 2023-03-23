@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 from evotorch.algorithms import CMAES, PGPE
 from evotorch.logging import StdOutLogger
@@ -26,7 +28,7 @@ def run_agent(env: Env,
             obs, reward, _, _, stats = env.step(action)
             epoch_reward += reward
 
-            pbar.set_postfix(epoch_reward=np.round(epoch_reward, 3))
+            pbar.set_postfix(epoch_reward=np.round(epoch_reward, 3), **stats)
             env.render(show=True)
         return epoch_reward
 
@@ -91,16 +93,19 @@ def run_experiment(field_size=156,
     # Setup environment
     env = Env(field_size, dynamics_choice[dynamics_id])
     # Setup agent
-    agent = NeuralAutomataAgent(kernel_sizes=[3, 3],
-                                p_agent_dropout=0.25)
+    agent = NeuralAutomataAgent(kernel_sizes=[3,],
+                                p_agent_dropout=0.25,
+                                scale=0.01)
     # Run the agent-env loop
     run_agent(env, agent, epochs, epoch_iters)
 
 
 if __name__ == '__main__':
-    run_experiment(field_size=156,
+    setup_logging(logging.ERROR)
+
+    run_experiment(field_size=64,
                    epochs=50,
-                   epoch_iters=20,
-                   dynamics_id='st-perlin',
-                   agent_ratio=0.1,
+                   epoch_iters=10,
+                   dynamics_id='dyn-pred',
+                   agent_ratio=0.05,
                    )
