@@ -1,6 +1,6 @@
-
+import numpy as np
 from matplotlib import pyplot as plt
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 from core.agent.static import ConstAgent, BrownianAgent
 from core.agent.gradient import GradientAgent, PhysarumAgent
@@ -29,19 +29,16 @@ def _manual_step(env: Env, action: ActType):
 
 
 def run_agent(env: Env, agent: Agent, iters=1000, show_each=1):
-
     total_reward = 0
     obs = env._get_current_obs
 
-    for i in tqdm(range(1, iters+1)):
+    for i in (pbar := trange(iters)):
         action = agent.forward(obs)
         obs, reward, _, _, stats = env.step(action)
         total_reward += reward
 
         if show_each > 0 and i % show_each == 0:
-            print(f'drawing progress at iteration {i}: '
-                  f'total_reward={total_reward}')
-            print(stats)
+            pbar.set_postfix(total_reward=np.round(total_reward, 3), **stats)
             env.render()
             plt.show()
 
