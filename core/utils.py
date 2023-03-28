@@ -158,7 +158,7 @@ def np_info(grad):
 def setup_logging(level=logging.INFO, disable_warnings: bool = False):
     # setup logging
     logging.basicConfig(level=level)
-    # disable matplotlib warnings, mabye put that into EnvDrawer
+    # disable matplotlib warnings, mabye put that into InteractivePlotter
     matplotlib.pyplot.set_loglevel('error')
     # disable extra warnings not controlled by logging
     if disable_warnings or level > logging.WARNING:

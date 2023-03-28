@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Optional
+
+import numpy as np
 
 from core.base_types import ObsType, ActType, AgtType
 
@@ -7,6 +10,9 @@ class Agent(ABC):
     @abstractmethod
     def forward(self, obs: ObsType) -> ActType:
         pass
+
+    def render(self) -> Optional[np.ndarray]:
+        return None
 
     @staticmethod
     def postprocess_action(agents: AgtType, action: ActType) -> ActType:

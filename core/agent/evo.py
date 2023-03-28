@@ -100,23 +100,30 @@ class NeuralAutomataAgent(Agent, nn.Module):
                                       **model_kwargs)
         # And these are coefficients for later scaling in forward() step
         self.action_coefs = np.array([scale, scale, deposit]).reshape((-1, 1))
+        self._sense_output = None
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
         idx = AgentIndexer(medium.shape[1:], agents)
 
         # Transform to Tensor, call internal tensor model, transform back to XArray
-        sense_input_tensor = self._medium2tensor(medium)
-        sense_transform_tensor = self.model(sense_input_tensor)
-        sense_transform = self._tensor2medium(medium, sense_transform_tensor)
+        sense_tensor = self._medium2tensor(medium)
+        sense_tensor = self.model(sense_tensor)
+        self._sense_output = self._tensor2medium(medium, sense_tensor)
 
         # Get per-agent actions from sensed environment transformed by reception model
-        per_agent_output = idx.field_by_agents(sense_transform, only_alive=False)
+        per_agent_output = idx.field_by_agents(self._sense_output, only_alive=False)
         # Rescale output actions
         per_agent_output *= self.action_coefs
         # Build action XArray
         action = DataInitializer.init_action_for(agents, per_agent_output)
         return action
+
+    def render(self) -> Optional[np.ndarray]:
+        # TODO: prepare image
+        #  - check channel order
+        #  - normalize channels
+        return self._sense_output.to_numpy()
 
     def _medium2tensor(self, medium: MediumType) -> th.Tensor:
         # Select required channels

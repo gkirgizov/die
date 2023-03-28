@@ -15,7 +15,7 @@ from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperat
     Array1C, ActionFunc
 from core.data_init import DataInitializer
 from core import utils
-from core.plotting import EnvDrawer
+from core.plotting import EnvRenderer
 from core.utils import AgentIndexer, ChannelLogger
 
 RenderFrame = TypeVar('RenderFrame')
@@ -81,9 +81,7 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.buffer_medium = self.medium.copy(deep=True)
 
-        self._drawer = EnvDrawer(field_size, size=5, aspect=self._get_aspect_ratio,
-                                 field_colors_id='rgb')
-        self._drawer.show(self.medium, self.agents)  # initial show
+        self._renderer = EnvRenderer(field_size, field_colors_id='rgb')
 
         self._log_agent = ChannelLogger(self.agents, channels=['x', 'y'], num=self._num_alive_agents)
         # self._log_agent.log_update(self.agents)
@@ -126,11 +124,8 @@ class Env(gym.Env[ObsType, ActType]):
         # Then goes sensory stage by Agent
         return self._get_current_obs, reward, terminated, truncated, info
 
-    def render(self, show=True) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
-        result = self._drawer.draw(self.medium, self.agents)
-        if show:
-            plt.show()
-        return result
+    def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
+        return self._renderer.render(self.medium, self.agents)
 
     def render_animation(self,
                          action_function: ActionFunc,
@@ -140,6 +135,7 @@ class Env(gym.Env[ObsType, ActType]):
         def frame_step(frame):
             action = action_function(self._get_current_obs)
             self.step(action)
+            # TODO: upd usage
             self._drawer.update(self.medium, self.agents)
 
         animate = FuncAnimation(
