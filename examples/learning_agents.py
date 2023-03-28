@@ -11,6 +11,7 @@ from tqdm import tqdm, trange
 from core.agent.evo import NeuralAutomataAgent, ConvolutionModel
 from core.data_init import WaveSequence
 from core.env import Env, Dynamics
+from core.plotting import InteractivePlotter
 from core.utils import setup_logging
 
 
@@ -19,6 +20,8 @@ def run_agent(env: Env,
               epochs: int = 100,
               epoch_iters: int = 50,
               ):
+    plotter = InteractivePlotter.get(env, agent)
+
     def run_epoch(agent: NeuralAutomataAgent) -> float:
         obs = env._get_current_obs
         epoch_reward = 0.
@@ -29,7 +32,7 @@ def run_agent(env: Env,
             epoch_reward += reward
 
             pbar.set_postfix(epoch_reward=np.round(epoch_reward, 3), **stats)
-            env.render(show=True)
+            plotter.draw()
         return epoch_reward
 
     print(f'Network has {count_parameters(agent.model)} parameters')
@@ -40,7 +43,7 @@ def run_agent(env: Env,
         'max',
         network=agent,
         network_eval_func=run_epoch,
-        initial_bounds=[-0.2, 0.2],
+        initial_bounds=[-0.5, 0.5],
         # device='cuda:0',
         # num_actors='max',
         num_actors=1,
@@ -93,7 +96,8 @@ def run_experiment(field_size=156,
     # Setup environment
     env = Env(field_size, dynamics_choice[dynamics_id])
     # Setup agent
-    agent = NeuralAutomataAgent(kernel_sizes=[3,],
+    agent = NeuralAutomataAgent(initial_obs=env._get_current_obs,
+                                kernel_sizes=[3, 3, 3],
                                 p_agent_dropout=0.25,
                                 scale=0.01)
     # Run the agent-env loop
@@ -103,9 +107,9 @@ def run_experiment(field_size=156,
 if __name__ == '__main__':
     setup_logging(logging.ERROR)
 
-    run_experiment(field_size=64,
-                   epochs=50,
-                   epoch_iters=10,
+    run_experiment(field_size=128,
+                   epochs=100,
+                   epoch_iters=5,
                    dynamics_id='dyn-pred',
                    agent_ratio=0.05,
                    )

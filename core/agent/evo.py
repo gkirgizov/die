@@ -90,6 +90,7 @@ class NeuralAutomataAgent(Agent, nn.Module):
                  scale: float = 0.1,
                  deposit: float = 1.0,
                  with_agent_channel: bool = True,
+                 initial_obs: Optional[ObsType] = None,
                  **model_kwargs,
                  ):
         super().__init__()
@@ -100,7 +101,8 @@ class NeuralAutomataAgent(Agent, nn.Module):
                                       **model_kwargs)
         # And these are coefficients for later scaling in forward() step
         self.action_coefs = np.array([scale, scale, deposit]).reshape((-1, 1))
-        self._sense_output = None
+        self._sense_output = initial_obs[1] \
+            if initial_obs else np.ones((1, 1, 3))
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
@@ -114,16 +116,21 @@ class NeuralAutomataAgent(Agent, nn.Module):
         # Get per-agent actions from sensed environment transformed by reception model
         per_agent_output = idx.field_by_agents(self._sense_output, only_alive=False)
         # Rescale output actions
-        per_agent_output *= self.action_coefs
+        per_agent_output = self._rescale(per_agent_output)
         # Build action XArray
         action = DataInitializer.init_action_for(agents, per_agent_output)
         return action
 
-    def render(self) -> Optional[np.ndarray]:
-        # TODO: prepare image
-        #  - check channel order
-        #  - normalize channels
-        return self._sense_output.to_numpy()
+    def render(self) -> Sequence[np.ndarray]:
+        data = self._sense_output.to_numpy()
+        # Move channel dimension as the last dim
+        rgb_channels = np.moveaxis(data, 0, -1)
+        return [rgb_channels]
+
+    def _rescale(self, per_agent_output: np.ndarray):
+        per_agent_output[:2, :] = (per_agent_output[:2, :] - .5) * 2.0
+        per_agent_output *= self.action_coefs
+        return per_agent_output
 
     def _medium2tensor(self, medium: MediumType) -> th.Tensor:
         # Select required channels
