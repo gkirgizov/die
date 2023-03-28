@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 
@@ -11,8 +11,8 @@ class Agent(ABC):
     def forward(self, obs: ObsType) -> ActType:
         pass
 
-    def render(self) -> Optional[np.ndarray]:
-        return None
+    def render(self) -> Sequence[Optional[np.ndarray]]:
+        return [None]
 
     @staticmethod
     def postprocess_action(agents: AgtType, action: ActType) -> ActType:

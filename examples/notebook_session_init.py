@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 
 from core.base_types import DataChannels
 from core.data_init import DataInitializer
-from core.plotting import EnvDrawer
+from core.plotting import InteractivePlotter
 
 
 def get_test_fields(field_size, agents_ratio=0.2):
@@ -26,8 +26,6 @@ def get_test_fields(field_size, agents_ratio=0.2):
 # Get & plot
 field_sz = (8, 6)
 medium, agents, action = get_test_fields(field_sz)
-EnvDrawer(field_sz).show(medium, agents)
-plt.show()
 
 # Alive mask indexing
 alive = agents.sel(channel='alive')

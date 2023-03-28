@@ -22,6 +22,7 @@ def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=300)
   # Setup the environment
   dynamics = Dynamics(init_agent_ratio=agent_ratio)
   env = Env(field_size, dynamics)
+  plotter = InteractivePlotter.get(env, agent)
 
   total_reward = 0
   obs = env._get_current_obs
@@ -32,7 +33,7 @@ def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=300)
     total_reward += reward
     # Visualisation & logging
     pbar.set_postfix(total_reward=np.round(total_reward, 3))
-    env.render(show=True)
+    plotter.draw()
 ```
 
 To reproduce the GIF-s above you can run it with following agents:
