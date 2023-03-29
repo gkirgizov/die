@@ -20,7 +20,7 @@ class ConvolutionModel(nn.Module):
                  num_act_channels: int = 3,
                  kernel_sizes: Sequence[int] = (3,),
                  boundary: str = 'circular',
-                 p_agent_dropout: float = 0.5,
+                 p_agent_dropout: float = 0.,
                  ):
         """
         Model: neuroevolution of Convolution kernel,
@@ -48,7 +48,6 @@ class ConvolutionModel(nn.Module):
         input_channels = [num_obs_channels] * num_kernels
         kernel_channels = [num_obs_channels] * (num_kernels-1) + [num_act_channels]
 
-        # TODO: do I do some sample eg from Normal distrib? or deterministic policy?
         kernels = [
             nn.Conv2d(
                 in_channels=in_chans,
@@ -56,15 +55,15 @@ class ConvolutionModel(nn.Module):
                 kernel_size=kernel_size,
                 padding='same',
                 padding_mode=boundary,
-                bias=True
+                bias=False
             )
             for in_chans, kernel_size, out_chans
             in zip(input_channels, kernel_sizes, kernel_channels)
         ]
         # TODO: add fully connected (ie channel info exchange) before final output
         # NB: notice the last activation function
-        # for normalizing the outputs into [0,1] range
-        kernels.append(nn.Sigmoid())
+        # for normalizing the outputs into [-1, 1] range
+        kernels.append(nn.Tanh())
         # Dropout for breaking synchrony between agent actions
         self.agent_dropout = nn.Dropout(p=p_agent_dropout)
         # Final model
@@ -128,7 +127,7 @@ class NeuralAutomataAgent(Agent, nn.Module):
         return [rgb_channels]
 
     def _rescale(self, per_agent_output: np.ndarray):
-        per_agent_output[:2, :] = (per_agent_output[:2, :] - .5) * 2.0
+        # per_agent_output[:2, :] = (per_agent_output[:2, :] - .5) * 2.0
         per_agent_output *= self.action_coefs
         return per_agent_output
 
