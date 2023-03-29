@@ -30,7 +30,7 @@ def linear_action_cost(action: ActType, weights=(0.02, 0.01)) -> Array1C:
     # Default cost of actions is computed as linear combination of:
     #  total crossed distance plus chemical deposition
     dist = np.linalg.norm(action.sel(channel=['dx', 'dy']), axis=0)
-    deposit = action.sel(channel='deposit1')
+    deposit = np.abs(action.sel(channel='deposit1'))
     cost = weights[0] * deposit + weights[1] * dist
     return cost
 
