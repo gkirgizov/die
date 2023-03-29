@@ -32,6 +32,7 @@ Publish
 - [x] Readme ;; add research aims?
 - [x] make minimal example
 - [x] GIF demo with Starting code for gifs
+- [ ] compress gifs
 - [ ] make Env the gym.Env
 - [ ] few tests & CI
 - [ ] **Resolve question with multi-agent interface??**
@@ -172,6 +173,35 @@ Necessary core
             criteria is some baseline performance of Random agent
 
         - [ ] create Weather Forecast Env
+    - [ ] Evotorch + Neural CA
+        - [x] basic nn.Module impl
+        - [ ] setup experiments
+            - [x] make some statistics for action (maybe visual)
+                  to understand what's happening.
+            - [x] visualize env after kernel application
+            - [ ] visualize actions??
+            - [ ] **visualise learning dynamics (reward)**
+            - [ ] take the best model & run it
+                  also understand what individual is visualised really
+            - [ ] make checkpoints serialize
+
+            - [ ] NB: **They're Very Sensitive to Initial Conditions**
+            - [ ] try adding FC layer
+            - [ ] try different learning settings
+        - [ ] experiment milestones
+            - [ ] reproduce static env (like gradient agent)
+        - [ ] test sanity of module impl (basic backprop etc. operations in tests)
+        - [ ] basic learning?
+
+    - [ ] Renderer refactoring
+        - [x] separation of responsibility
+        - [x] usages of InteractivePlotter
+        - [x] rename InteractivePlotter to InteractivePlotter; movements for clear imports
+        - [x] static InteractivePlotter(Env, Agent)
+        - [x] usages and usability of Env.render
+        - [x] AgentDrawer for Convolution agent
+            here I have the problem that initial tensor is zero!
+        - [ ] animation drawing
 
 - [ ] test deposit with communication
 

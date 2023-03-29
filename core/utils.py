@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import Sequence, Dict
 
 import matplotlib
@@ -154,8 +155,11 @@ def np_info(grad):
             f'avg: {np.mean(grad).round(3)}, std: {np.std(grad).round(3)}')
 
 
-def setup_logging(level=logging.INFO):
+def setup_logging(level=logging.INFO, disable_warnings: bool = False):
     # setup logging
     logging.basicConfig(level=level)
-    # disable matplotlib warnings, mabye put that into EnvDrawer
+    # disable matplotlib warnings, mabye put that into InteractivePlotter
     matplotlib.pyplot.set_loglevel('error')
+    # disable extra warnings not controlled by logging
+    if disable_warnings or level > logging.WARNING:
+        warnings.filterwarnings('ignore')

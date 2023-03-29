@@ -15,7 +15,7 @@ from core.base_types import DataChannels, ActType, ObsType, MaskType, CostOperat
     Array1C, ActionFunc
 from core.data_init import DataInitializer
 from core import utils
-from core.plotting import EnvDrawer
+from core.render import EnvRenderer
 from core.utils import AgentIndexer, ChannelLogger
 
 RenderFrame = TypeVar('RenderFrame')
@@ -30,7 +30,7 @@ def linear_action_cost(action: ActType, weights=(0.02, 0.01)) -> Array1C:
     # Default cost of actions is computed as linear combination of:
     #  total crossed distance plus chemical deposition
     dist = np.linalg.norm(action.sel(channel=['dx', 'dy']), axis=0)
-    deposit = action.sel(channel='deposit1')
+    deposit = np.abs(action.sel(channel='deposit1'))
     cost = weights[0] * deposit + weights[1] * dist
     return cost
 
@@ -81,9 +81,7 @@ class Env(gym.Env[ObsType, ActType]):
 
         self.buffer_medium = self.medium.copy(deep=True)
 
-        self._drawer = EnvDrawer(field_size, size=6, aspect=self._get_aspect_ratio,
-                                 field_colors_id='rgb')
-        self._drawer.show(self.medium, self.agents)  # initial show
+        self._renderer = EnvRenderer(field_size, field_colors_id='rgb')
 
         self._log_agent = ChannelLogger(self.agents, channels=['x', 'y'], num=self._num_alive_agents)
         # self._log_agent.log_update(self.agents)
@@ -126,11 +124,8 @@ class Env(gym.Env[ObsType, ActType]):
         # Then goes sensory stage by Agent
         return self._get_current_obs, reward, terminated, truncated, info
 
-    def render(self, show=True) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
-        result = self._drawer.draw(self.medium, self.agents)
-        if show:
-            plt.show()
-        return result
+    def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
+        return self._renderer.render(self.medium, self.agents)
 
     def render_animation(self,
                          action_function: ActionFunc,
@@ -140,16 +135,17 @@ class Env(gym.Env[ObsType, ActType]):
         def frame_step(frame):
             action = action_function(self._get_current_obs)
             self.step(action)
+            # TODO: upd usage
             self._drawer.update(self.medium, self.agents)
 
         animate = FuncAnimation(
             fig=self._drawer.fig,
             func=frame_step,
             save_count=num_frames,
-            interval=20,
+            interval=40,
         )
         if filename:
-            animate.save(filename, fps=60, dpi=200)
+            animate.save(filename, fps=10, dpi=100)
         return animate
 
     def _medium_diffuse_decay(self):

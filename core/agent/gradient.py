@@ -1,54 +1,13 @@
-from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Callable, Union
+from typing import Optional, Sequence
 
 import numpy as np
 import scipy
 import xarray as da
 
-from core.base_types import ActType, ObsType, AgtType
+from core.agent.base import Agent
+from core.base_types import AgtType, ActType, ObsType
 from core.data_init import DataInitializer
-from core.utils import xy2polar, polar2xy, renormalize_radians, discretize, AgentIndexer, get_radians
-
-
-class Agent(ABC):
-    @abstractmethod
-    def forward(self, obs: ObsType) -> ActType:
-        pass
-
-    @staticmethod
-    def postprocess_action(agents: AgtType, action: ActType) -> ActType:
-        masked = Agent._masked_alive(agents, action)
-        rescaled = Agent._rescale_outputs(masked)
-        return rescaled
-
-    # TODO: rescaling: seems unnecessary because of [0, 1] bounds?
-    @staticmethod
-    def _rescale_outputs(action: ActType) -> ActType:
-        """Scale outputs to their natural boundaries."""
-        return action
-
-    # TODO: agent masking: seems unnecessary because of natural Env logic?
-    @staticmethod
-    def _masked_alive(agents: AgtType, action: ActType) -> ActType:
-        agent_alive_mask = agents.sel(channel='alive') > 0
-        masked_action = action * agent_alive_mask
-        return masked_action
-
-
-class ModelAgentSket(Agent):
-    def __init__(self):
-        # TODO: need joint channels info for the system:
-        #  it must know about its own presence
-        self.model: Callable[[ObsType], ActType] = None
-
-    def forward(self, obs: ObsType) -> ActType:
-        agents, medium = obs
-
-        action = self.model(obs)
-
-        result_action = self.postprocess_action(agents, action)
-
-        return result_action
+from core.utils import get_radians, polar2xy, AgentIndexer, discretize, renormalize_radians, xy2polar
 
 
 class GradientAgent(Agent):
@@ -79,6 +38,8 @@ class GradientAgent(Agent):
 
         self._prev_grad = self._get_some_noise()
         self._direction_rads = get_radians(self._prev_grad)
+
+        self._render_grad = None
 
     def _get_some_noise(self):
         ncoords = 2
@@ -141,6 +102,8 @@ class GradientAgent(Agent):
 
         # Update agent direction after all transformations
         self._direction_rads = get_radians(grad_per_agent)
+        # Update render data
+        self._render_grad = grad_field
 
         # Chemical deposit relative to discovered food
         food = medium.sel(channel='env_food')
@@ -153,6 +116,17 @@ class GradientAgent(Agent):
 
         # return self.postprocess_action(agents, action)
         return action
+
+    def render(self) -> Sequence[np.ndarray]:
+        if self._render_grad is None:
+            pixel = np.ones((1, 1, 3))
+            return [pixel]
+        r = self._render_grad.sel(channel='dx').values
+        g = self._render_grad.sel(channel='dy').values
+        b = np.zeros_like(r)
+        rgb = np.stack([r, g, b], axis=-1)
+        rgb = 0.5 * (rgb + 1.)  # rescale from [-1, 1] to [0, 1]
+        return [rgb]
 
 
 class PhysarumAgent(GradientAgent):
@@ -235,40 +209,3 @@ class PhysarumAgent(GradientAgent):
         delta_grad = self._discrete_turn(grad)
         # delta_grad = np.stack(polar2xy(1., self._direction_rads))  # const direction
         return delta_grad
-
-
-class ConstAgent(Agent):
-    def __init__(self, delta_xy: Tuple[float, float], deposit: float = 0.):
-        self._data = {'dx': delta_xy[0],
-                      'dy': delta_xy[1],
-                      'deposit1': deposit}
-
-    def forward(self, obs: ObsType) -> ActType:
-        agents, medium = obs
-
-        # at each agent location write our const vector
-        action = DataInitializer.init_action_for(agents)
-        for chan in action.coords['channel'].values:
-            action.loc[dict(channel=chan)] = self._data[chan]
-
-        return action
-        # return self.postprocess_action(agents, action)
-
-
-class BrownianAgent(Agent):
-    def __init__(self, move_scale: float = 0.01, deposit_scale: float = 0.5):
-        self._scale = move_scale
-        self._dep_scale = deposit_scale
-
-    def forward(self, obs: ObsType) -> ActType:
-        agents, medium = obs
-
-        s = self._scale
-        action = DataInitializer.action_for(agents) \
-            .with_noise('dx', -s, s) \
-            .with_noise('dy', -s, s) \
-            .with_noise('deposit1', 0., self._dep_scale) \
-            .build_agents()
-
-        return action
-        # return self.postprocess_action(agents, action)

@@ -11,6 +11,8 @@ matplotlib
 seaborn
 
 gymnasium
+torch
+evotorch
 
 pytest
 tqdm

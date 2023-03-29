@@ -1,11 +1,13 @@
+import numpy as np
+from tqdm import tqdm, trange
 
-from matplotlib import pyplot as plt
-from tqdm import tqdm
-
-from core.agent import ConstAgent, Agent, BrownianAgent, GradientAgent, PhysarumAgent
+from core.agent.static import ConstAgent, BrownianAgent
+from core.agent.gradient import GradientAgent, PhysarumAgent
+from core.agent.base import Agent
 from core.base_types import ActType
 from core.data_init import WaveSequence
 from core.env import Env, Dynamics
+from core.plotting import InteractivePlotter
 from core.utils import setup_logging
 
 
@@ -26,22 +28,18 @@ def _manual_step(env: Env, action: ActType):
     return env._get_current_obs, 0, False, False, {}
 
 
-def run_agent(env: Env, agent: Agent, iters=1000, show_each=1):
-
+def run_agent(env: Env, agent: Agent, iters=1000):
     total_reward = 0
     obs = env._get_current_obs
+    plotter = InteractivePlotter.get(env, agent)
 
-    for i in tqdm(range(1, iters+1)):
+    for i in (pbar := trange(iters)):
         action = agent.forward(obs)
         obs, reward, _, _, stats = env.step(action)
         total_reward += reward
 
-        if show_each > 0 and i % show_each == 0:
-            print(f'drawing progress at iteration {i}: '
-                  f'total_reward={total_reward}')
-            print(stats)
-            env.render()
-            plt.show()
+        pbar.set_postfix(total_reward=np.round(total_reward, 3), **stats)
+        plotter.draw()
 
 
 def try_const_agent(**kwargs):
@@ -111,7 +109,7 @@ def run_experiment(field_size=156,
 
 if __name__ == '__main__':
     run_experiment(field_size=156,
-                   agent_id='physarum',
+                   agent_id='grad',
                    dynamics_id='st-perlin',
                    agent_ratio=0.1,
                    )
