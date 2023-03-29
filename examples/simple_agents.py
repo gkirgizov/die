@@ -109,7 +109,7 @@ def run_experiment(field_size=156,
 
 if __name__ == '__main__':
     run_experiment(field_size=156,
-                   agent_id='physarum',
+                   agent_id='grad',
                    dynamics_id='st-perlin',
                    agent_ratio=0.1,
                    )

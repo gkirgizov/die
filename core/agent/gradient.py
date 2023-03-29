@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import scipy
@@ -38,6 +38,8 @@ class GradientAgent(Agent):
 
         self._prev_grad = self._get_some_noise()
         self._direction_rads = get_radians(self._prev_grad)
+
+        self._render_grad = None
 
     def _get_some_noise(self):
         ncoords = 2
@@ -100,6 +102,8 @@ class GradientAgent(Agent):
 
         # Update agent direction after all transformations
         self._direction_rads = get_radians(grad_per_agent)
+        # Update render data
+        self._render_grad = grad_field
 
         # Chemical deposit relative to discovered food
         food = medium.sel(channel='env_food')
@@ -112,6 +116,17 @@ class GradientAgent(Agent):
 
         # return self.postprocess_action(agents, action)
         return action
+
+    def render(self) -> Sequence[np.ndarray]:
+        if self._render_grad is None:
+            pixel = np.ones((1, 1, 3))
+            return [pixel]
+        r = self._render_grad.sel(channel='dx').values
+        g = self._render_grad.sel(channel='dy').values
+        b = np.zeros_like(r)
+        rgb = np.stack([r, g, b], axis=-1)
+        rgb = 0.5 * (rgb + 1.)  # rescale from [-1, 1] to [0, 1]
+        return [rgb]
 
 
 class PhysarumAgent(GradientAgent):
