@@ -57,7 +57,6 @@ class ConvolutionModel(nn.Module):
                 padding='same',
                 padding_mode=boundary,
                 bias=False
-
             )
             for in_chans, kernel_size, out_chans
             in zip(input_channels, kernel_sizes, kernel_channels)
@@ -105,9 +104,9 @@ class NeuralAutomataAgent(Agent, nn.Module):
                                       num_act_channels=len(DataChannels.actions),
                                       **model_kwargs)
         # And these are coefficients for later scaling in forward() step
-        self.action_coefs = np.array([scale, scale, deposit]).reshape((-1, 1))
-        self._sense_output = initial_obs[1] \
-            if initial_obs else np.ones((1, 1, 3))
+        self.action_coefs = th.tensor([scale, scale, deposit]).reshape((-1, 1))
+        self._sense_output = th.as_tensor(initial_obs[1].values) \
+            if initial_obs else th.ones((1, 3, 2, 2))
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
@@ -116,23 +115,33 @@ class NeuralAutomataAgent(Agent, nn.Module):
         # Transform to Tensor, call internal tensor model, transform back to XArray
         sense_tensor = self.medium2tensor(self.obs_channels, medium)
         sense_tensor = self.model(sense_tensor)
-        self._sense_output = self.tensor2medium(medium, sense_tensor)
+        self._sense_output = sense_tensor
+
+        # self._sense_output = self.tensor2medium(medium, sense_tensor)
+        # per_agent_output = idx.field_by_agents(self._sense_output, only_alive=False)
 
         # Get per-agent actions from sensed environment transformed by reception model
-        per_agent_output = idx.field_by_agents(self._sense_output, only_alive=False)
+        per_agent_output = idx.tensor_by_agents(sense_tensor.squeeze(), only_alive=False)
         # Rescale output actions
         per_agent_output = self._rescale(per_agent_output)
+
+        # NB: action output here include a lot of spurious
+        # values coming from "dead" agents, but Environment
+        # wouldn't count them, because it masks them.
+
         # Build action XArray
-        action = DataInitializer.init_action_for(agents, per_agent_output)
+        action_data = per_agent_output.detach()
+        action = DataInitializer.init_action_for(agents, action_data)
         return action
 
     def render(self) -> Sequence[np.ndarray]:
-        data = self._sense_output.to_numpy()
         # Move channel dimension as the last dim
-        rgb_channels = np.moveaxis(data, 0, -1)
+        data = self._sense_output.squeeze()
+        data = th.moveaxis(data, 0, -1)
+        rgb_channels = data.detach().numpy()
         return [rgb_channels]
 
-    def _rescale(self, per_agent_output: np.ndarray):
+    def _rescale(self, per_agent_output):
         # per_agent_output[:2, :] = (per_agent_output[:2, :] - .5) * 2.0
         per_agent_output *= self.action_coefs
         return per_agent_output

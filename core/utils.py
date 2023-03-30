@@ -4,7 +4,9 @@ from typing import Sequence, Dict
 
 import matplotlib
 import numpy as np
+import xarray
 import xarray as da
+import torch as th
 
 from core.base_types import MediumType, AgtType, FieldIdx, ActType
 
@@ -13,7 +15,8 @@ class AgentIndexer:
 
     def __init__(self, field_size, agents: AgtType):
         self.__agents = agents  # read-only here
-        self.__coordgrid = get_meshgrid(field_size)
+        # Map of floating point coords to numpy array indices
+        self.__imesh = get_indices_mesh(field_size)
 
     def agents_to_field_coords(self, field: da.DataArray, only_alive=True) -> FieldIdx:
         coord_chans = ['x', 'y']
@@ -28,7 +31,7 @@ class AgentIndexer:
         masked_action = action.where(alive > 0.).dropna(dim='index')
         return masked_action
 
-    def field_by_agents(self, field: da.DataArray, only_alive=True, offset=0.) -> da.DataArray:
+    def field_by_agents(self, field: da.DataArray, only_alive=False, offset=0.) -> da.DataArray:
         """Returns array of channels selected from field per agent in agents array.
 
         :param field:
@@ -44,6 +47,17 @@ class AgentIndexer:
         cell_indexer = dict(zip(coord_chans, idx_coords))
         field_selection = field.sel(**cell_indexer, method='nearest')
         return field_selection
+
+    def tensor_by_agents(self, tensor: th.Tensor, only_alive=False, offset=0.) -> da.DataArray:
+        # Get numeric integer coordinates given index-mesh
+        indices = self.field_by_agents(self.__imesh, only_alive, offset)
+        # Select tensor elements given integer coordinates
+        # TODO: somehow index all channels at once, or work with flattened indices
+        idx = indices.values
+        ixs = idx[0]
+        iys = idx[1]
+        selection = tensor[:, ixs, iys]
+        return selection
 
     def get_alive_agents(self, view=False) -> AgtType:
         """Returns only agents which are alive, dropping dead agents from array."""
@@ -97,6 +111,25 @@ def get_meshgrid(field_size: Sequence[int]) -> np.ndarray:
     coord_grid = np.stack(np.meshgrid(*xcs))
     # steps = [abs(coords[1] - coords[0]) for coords in xcs]
     return coord_grid
+
+
+def get_indices_mesh(field_size: Sequence[int],
+                     coordnames: Sequence[str] = tuple('xyzuvw')) -> xarray.DataArray:
+    """Returns DataArray with float coords which maps them to their array indices.
+    Allows approximate mapping of coords (XArray's strength) into numpy array indices."""
+    ndims = len(field_size)
+    # NB: dim order is reversed in xarray
+    coordnames = list(reversed(coordnames[:ndims]))
+    # NB: don't confuse str-indices of the coords with dim names
+    coords = {'coord': coordnames}
+    mesh_coords = [np.linspace(0., 1., num=size) for size in reversed(field_size)]
+    mesh_coords = dict(zip(coordnames, mesh_coords))
+    coords.update(mesh_coords)
+
+    indices = [np.arange(size) for size in field_size]
+    indices_mesh = np.stack(np.meshgrid(*indices))
+    indices_map = xarray.DataArray(data=indices_mesh, coords=coords)
+    return indices_map
 
 
 def get_agents_by_medium(medium: MediumType) -> np.ndarray:
