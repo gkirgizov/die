@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 import torch as th
+import torch.autograd
 
 from core.agent.evo import ConvolutionModel
 
@@ -38,10 +39,36 @@ def test_convolution_model_apply(field_size, kernel_sizes):
                              kernel_sizes=kernel_sizes,
                              p_agent_dropout=0.)
     model.init_weights()
-
     output = model.forward(input_data)
-    print(input_data.shape, '->', output.shape)
 
     # Channels can differ, so use 0th channel
     assert th.any(input_data[0, 0, :, :] != output[0, 0, :, :])
     assert num_act_channels in output.shape
+
+
+@pytest.mark.parametrize('field_size', [(12, 12), (12, 15)])
+def test_grad(field_size):
+    torch.autograd.set_detect_anomaly(True)
+
+    num_obs_channels = 3
+    num_act_channels = 2
+    kernel_sizes = (3, 5)
+    # NB: correct 4D shape for torch data, needed for valid padding
+    obs_shape = (1, num_obs_channels, *field_size)
+    input_data = th.rand(obs_shape, requires_grad=True)
+
+    model = ConvolutionModel(num_act_channels=num_act_channels,
+                             num_obs_channels=num_obs_channels,
+                             kernel_sizes=kernel_sizes,
+                             p_agent_dropout=0.25,
+                             requires_grad=True)
+    output_data = model.forward(input_data)
+    output = output_data.mean()
+
+    assert input_data.requires_grad
+    assert output.requires_grad
+    assert input_data.grad is None
+
+    output.backward()
+
+    assert input_data.grad is not None

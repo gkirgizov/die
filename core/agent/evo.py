@@ -21,6 +21,7 @@ class ConvolutionModel(nn.Module):
                  kernel_sizes: Sequence[int] = (3,),
                  boundary: str = 'circular',
                  p_agent_dropout: float = 0.,
+                 requires_grad: bool = True,
                  ):
         """
         Model: neuroevolution of Convolution kernel,
@@ -56,6 +57,7 @@ class ConvolutionModel(nn.Module):
                 padding='same',
                 padding_mode=boundary,
                 bias=False
+
             )
             for in_chans, kernel_size, out_chans
             in zip(input_channels, kernel_sizes, kernel_channels)
@@ -65,9 +67,13 @@ class ConvolutionModel(nn.Module):
         # for normalizing the outputs into [-1, 1] range
         kernels.append(nn.Tanh())
         # Dropout for breaking synchrony between agent actions
+        # TODO: need 1d dropout along channel dim
+        # Channel-dropout is possible only with nn.Dropout1d and shape (W, H, C)
+        # TODO: move dropout to Agent over 2d tensor (Batch, Agents, Channels)
         self.agent_dropout = nn.Dropout(p=p_agent_dropout)
         # Final model
         self.kernels = nn.Sequential(*kernels)
+        self.requires_grad_(requires_grad)
 
     def init_weights(self):
         for kernel in self.kernels:
@@ -108,9 +114,9 @@ class NeuralAutomataAgent(Agent, nn.Module):
         idx = AgentIndexer(medium.shape[1:], agents)
 
         # Transform to Tensor, call internal tensor model, transform back to XArray
-        sense_tensor = self._medium2tensor(medium)
+        sense_tensor = self.medium2tensor(self.obs_channels, medium)
         sense_tensor = self.model(sense_tensor)
-        self._sense_output = self._tensor2medium(medium, sense_tensor)
+        self._sense_output = self.tensor2medium(medium, sense_tensor)
 
         # Get per-agent actions from sensed environment transformed by reception model
         per_agent_output = idx.field_by_agents(self._sense_output, only_alive=False)
@@ -131,9 +137,10 @@ class NeuralAutomataAgent(Agent, nn.Module):
         per_agent_output *= self.action_coefs
         return per_agent_output
 
-    def _medium2tensor(self, medium: MediumType) -> th.Tensor:
+    @staticmethod
+    def medium2tensor(channels, medium: MediumType) -> th.Tensor:
         # Select required channels
-        sense_input: xa.DataArray = medium.sel(channel=self.obs_channels)
+        sense_input: xa.DataArray = medium.sel(channel=channels)
         # Build Tensor with the shape in torch format:
         # (channels, width, height)
         sense_input_tensor = th.as_tensor(sense_input.values, dtype=th.float32)
@@ -144,7 +151,8 @@ class NeuralAutomataAgent(Agent, nn.Module):
         sense_input_tensor = th.reshape(sense_input_tensor, shape4d)
         return sense_input_tensor
 
-    def _tensor2medium(self, input_medium: MediumType, tensor: th.Tensor) -> MediumType:
+    @staticmethod
+    def tensor2medium(input_medium: MediumType, tensor: th.Tensor) -> MediumType:
         # Strip extra dims and reshape back to internal format:
         # (channels, width, height) -> (width, height, channels)
         tensor = tensor.squeeze() #.movedim([0, 1, 2], [1, 2, 0])
