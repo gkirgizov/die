@@ -7,6 +7,9 @@ import numpy as np
 import xarray
 import xarray as da
 import torch as th
+import torch.nn as nn
+from evotorch import Solution
+from evotorch.neuroevolution import NEProblem
 
 from core.base_types import MediumType, AgtType, FieldIdx, ActType
 
@@ -196,3 +199,11 @@ def setup_logging(level=logging.INFO, disable_warnings: bool = False):
     # disable extra warnings not controlled by logging
     if disable_warnings or level > logging.WARNING:
         warnings.filterwarnings('ignore')
+
+
+def make_net(problem: NEProblem, solution: Solution) -> nn.Module:
+    """No-copying version of ``evotorch.NEProblem.make_net()``."""
+    parameters = solution.access_values(keep_evals=True)
+    with th.no_grad():
+        net = problem.parameterize_net(parameters)
+    return net

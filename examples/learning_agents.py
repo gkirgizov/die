@@ -6,34 +6,35 @@ from evotorch.algorithms import CMAES, PGPE
 from evotorch.logging import StdOutLogger, PandasLogger, MlflowLogger
 from evotorch.neuroevolution import NEProblem
 from evotorch.neuroevolution.net import count_parameters
-from matplotlib import pyplot as plt
 from tqdm import trange
 
 from core.agent.evo import NeuralAutomataAgent
 from core.data_init import WaveSequence
 from core.env import Env, Dynamics
 from core.plotting import InteractivePlotter
-from core.utils import setup_logging
+from core.utils import setup_logging, make_net
 
 
 def run_agent(env: Env,
               agent: NeuralAutomataAgent,
               epochs: int = 100,
               epoch_iters: int = 50,
-              ):
-    plotter = InteractivePlotter.get(env, agent)
+              ) -> NeuralAutomataAgent:
 
-    def run_epoch(agent: NeuralAutomataAgent) -> float:
+    def run_epoch(agent: NeuralAutomataAgent,
+                  iters=epoch_iters,
+                  plotter=None) -> float:
         obs = env._get_current_obs
         epoch_reward = 0.
 
-        for i in (pbar := trange(epoch_iters)):
+        for i in (pbar := trange(iters)):
             action = agent.forward(obs)
             obs, reward, _, _, stats = env.step(action)
             epoch_reward += reward
 
             pbar.set_postfix(epoch_reward=np.round(epoch_reward, 3), **stats)
-            plotter.draw()
+            if plotter:
+                plotter.draw()
         return epoch_reward
 
     print(f'Network has {count_parameters(agent.model)} parameters')
@@ -73,14 +74,23 @@ def run_agent(env: Env,
     #     }
     # )
 
-    # Create the MLFlow client
+    # Create the MLFlow client and 'run' object for logging into
     client = mlflow.tracking.MlflowClient()
-    # Start an MLFlow run to log to
     run = mlflow.start_run()
-    # Create an MlflowLogger instance
     _ = MlflowLogger(searcher, client=client, run=run)
 
     searcher.run(epochs)
+
+    # Get the best solution
+    solution_agent = make_net(problem, solution=searcher.status["pop_best"])
+    assert isinstance(solution_agent, NeuralAutomataAgent)
+
+    # Try running the best solution
+    plotter = InteractivePlotter.get(env, solution_agent)
+    env.reset()
+    reward = run_epoch(solution_agent, iters=epoch_iters*50, plotter=plotter)
+    print(f'Final reward of the best solution: {reward}')
+    return solution_agent
 
 
 def run_experiment(field_size=156,
@@ -105,8 +115,7 @@ def run_experiment(field_size=156,
     # Setup environment
     env = Env(field_size, dynamics_choice[dynamics_id])
     # Setup agent
-    agent = NeuralAutomataAgent(initial_obs=env._get_current_obs,
-                                kernel_sizes=[3, 3,],
+    agent = NeuralAutomataAgent(kernel_sizes=[3, 3,],
                                 # p_agent_dropout=0.25,
                                 scale=0.01,
                                 deposit=2.0,
@@ -119,8 +128,8 @@ if __name__ == '__main__':
     setup_logging(logging.ERROR)
 
     run_experiment(field_size=96,
-                   epochs=100,
-                   epoch_iters=5,
+                   epochs=4,
+                   epoch_iters=20,
                    # dynamics_id='dyn-pred',
                    dynamics_id='st-perlin-wide',
                    agent_ratio=0.10,
