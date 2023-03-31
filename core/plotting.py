@@ -1,6 +1,7 @@
 from itertools import chain
 from typing import Tuple, Sequence
 
+import matplotlib as mpl
 from matplotlib import pyplot as plt
 from matplotlib.image import AxesImage
 
@@ -34,7 +35,9 @@ class InteractivePlotter:
         #     ([spare_ax], self._renderers[1]),
         # ]
         if ion:
+            mpl.use("qtagg")
             plt.ion()
+            plt.show()
 
     @staticmethod
     def _init_axes(images: Sequence,
@@ -96,5 +99,9 @@ class InteractivePlotter:
     def draw(self):
         self.update()
         # TODO: add consideration of 'is_visible'
-        plt.draw()
-        plt.pause(0.01)
+        # Works!
+        self.fig.canvas.draw_idle()
+        self.fig.canvas.start_event_loop(0.001)
+
+        # plt.draw()
+        # plt.pause(0.01)
