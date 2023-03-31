@@ -180,18 +180,23 @@ Necessary core
                   to understand what's happening.
             - [x] visualize env after kernel application
             - [ ] visualize actions??
-            - [ ] **visualise learning dynamics (reward)**
-            - [ ] take the best model & run it
-                  also understand what individual is visualised really
+            - [x] **visualise learning dynamics (reward)**
+                - [x] try MLFlow
+            - [x] take the best model & run it
             - [ ] make checkpoints serialize
+            - [ ] try gpu (problem: inputs must be on GPU)
 
             - [ ] NB: **They're Very Sensitive to Initial Conditions**
             - [ ] try adding FC layer
+                read about:
+                .. _Self-Normalizing Neural Networks: https://arxiv.org/abs/1706.02515
+                .. _Efficient Object Localization Using Convolutional Networks: https://arxiv.org/abs/1411.4280
             - [ ] try different learning settings
         - [ ] experiment milestones
             - [ ] reproduce static env (like gradient agent)
-        - [ ] test sanity of module impl (basic backprop etc. operations in tests)
-        - [ ] basic learning?
+
+    - [ ] Gradient learning:
+        - [ ] test backward pass in Module
 
     - [ ] Renderer refactoring
         - [x] separation of responsibility
