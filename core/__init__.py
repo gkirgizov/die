@@ -3,27 +3,51 @@
 
 **Research Aims**
 - Let agents learn effective Operator dynamics of medium for prediction and their life
-- Find how agents establish communication channels
+- Find how agents establish communication
+
+**Research targets for success**
+- Beat some SoA model
+- Solve new task, inaccessible for previous models
+  Unsupervised image processing?
+  Object follower kernels?
+  Dynamics predictor?
+- Make just fucking cool thing, mind-blowing
+  (example is Xenobots evo algo)
+  Like learn DSP programs from convolutions (approximate FFT)
+  Kernels for distributed object detection? (e.g. find faces, find eyes)
+  Learn distributed robust programs (sorting/cleaning)
 
 **Possible Research Vectors**
-- Can prediction be temporally deep?
--
+- It can be research about Artificial Life:
+  how energetic (life/death) pressures influence patterns?
+- Learnable Robust Distributed Computing in the form of Signal processing
+  FPGA + DSP in Edge AI for custom image processing tasks.
+  - Research SoA: how difficult inference is?
+
+- Can I see agents+kernel as image attention?
+  So then I can try making agents position
+  a separate output of the model run on top of kernel-processed image,
+  fed-back into...
+- Can prediction be temporally deep? (like learning temporal models of env)
 - Measuring system complexity through some entropic-dynamics metrics
 - Learning to Communicate:
     - Finding correlation between medium capacity for message passing and system complexity
     - Provisioning some potential to establish better comm channels -- like a winning strategy.
-- Learning *dynamic* model of environment
-  Pushing agent to implicitly model/predict dynamics of the medium (food,
-
+- Learning *dynamic* model of environment in Cellular Automata
+  Pushing agent to implicitly model/predict dynamics of the medium
   Modeling operators ('change') instead of patterns ('things') in the world.
+
   How to compare it with NNs?
   Maybe with dynamic medium operators (diffusion/decay) that could work.
   Agents will learn the model, while NNs will not.
 
+**Proof-of-concepts**
+- Function approx: reproduce Sobel kernel given contour images
+
 Plan
 - [x] Stage 0.1: const moving
 - [x] Stage 0.2: classic physarum? without feeding/dying; just moving
-- [ ] Stage 0.3: basic intelligence: some obviously working learning agent (e.g. evolutionary)
+- [x] Stage 0.3: basic intelligence: some obviously working learning agent (e.g. evolutionary)
 -- can write an article here; publish as a new Env for ALife research
 - [ ] Stage 0.4: RL
 - [ ] Stage 0.5: FEP
@@ -32,7 +56,7 @@ Publish
 - [x] Readme ;; add research aims?
 - [x] make minimal example
 - [x] GIF demo with Starting code for gifs
-- [ ] compress gifs
+- [x] compress gifs
 - [ ] make Env the gym.Env
 - [ ] few tests & CI
 - [ ] **Resolve question with multi-agent interface??**
@@ -48,6 +72,15 @@ Concept:
       in default case I have trivial mapping with only one policy,
       in multi-agent setting I can have different agents with their own policies.
     - Well, I have continuous, homogeneous & cooperative (shared-policy), vectorized agents and environment.
+- [ ] Renderer refactoring
+    - [x] separation of responsibility
+    - [x] usages of InteractivePlotter
+    - [x] rename InteractivePlotter to InteractivePlotter; movements for clear imports
+    - [x] static InteractivePlotter(Env, Agent)
+    - [x] usages and usability of Env.render
+    - [x] AgentDrawer for Convolution agent
+        here I have the problem that initial tensor is zero!
+    - [ ] animation drawing
 
 Necessary core
 - [x] some basic data init ENVs per channels for tests YET minimal
@@ -160,10 +193,8 @@ Necessary core
    sounds like not quite; small incremental enhancement.
 
 - [ ] 0.3: basic learning
-    - [ ] a bit better streamline stats with tqdm
-    - [ ] measure avg perf of baseline setups
-    - [ ] tweak them
     - [ ] design baseline Experiment:
+        - [ ] measure avg perf of baseline setups
         - [ ] check if agents have enough pressure for learning communication
             need dying? Reward is enough?
         - [ ] setup clear Reward & performance characteristics (almost done)
@@ -172,7 +203,6 @@ Necessary core
             Env + base Agents + tune per avg performance
             criteria is some baseline performance of Random agent
 
-        - [ ] create Weather Forecast Env
     - [ ] Evotorch + Neural CA
         - [x] basic nn.Module impl
         - [ ] setup experiments
@@ -192,23 +222,25 @@ Necessary core
                 .. _Self-Normalizing Neural Networks: https://arxiv.org/abs/1706.02515
                 .. _Efficient Object Localization Using Convolutional Networks: https://arxiv.org/abs/1411.4280
             - [ ] try different learning settings
+                - [x] try different optimizer
+
         - [ ] experiment milestones
-            - [ ] reproduce static env (like gradient agent)
+            - [x] reproduce static env (like gradient agent)
+            - [ ] achieve results in dynamic env
+
+        - [ ] **Practical experiments**
+            - [ ] think on promising practical tasks
+                - What are the distinctive features of this approach?
+                  It's both distributed and yet they learn single kernel.
+                  What's new w.r.t. Neural Automata?
+            - [ ] choose promising practical tasks
+            - [ ] ? try Weather Forecast Env
+                  First fluid dynamics equation.
+                  Then real-world dataset with time-delayed supervised learning.
 
     - [ ] Gradient learning:
         - [ ] test backward pass in Module
 
-    - [ ] Renderer refactoring
-        - [x] separation of responsibility
-        - [x] usages of InteractivePlotter
-        - [x] rename InteractivePlotter to InteractivePlotter; movements for clear imports
-        - [x] static InteractivePlotter(Env, Agent)
-        - [x] usages and usability of Env.render
-        - [x] AgentDrawer for Convolution agent
-            here I have the problem that initial tensor is zero!
-        - [ ] animation drawing
-
-- [ ] test deposit with communication
 
 Important core enhancements:
 - [ ] add asynchronous setting to Env/Agent (random portion of agents moving)
