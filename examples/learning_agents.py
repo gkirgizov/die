@@ -1,14 +1,15 @@
 import logging
 
+import mlflow
 import numpy as np
 from evotorch.algorithms import CMAES, PGPE
-from evotorch.logging import StdOutLogger
+from evotorch.logging import StdOutLogger, PandasLogger, MlflowLogger
 from evotorch.neuroevolution import NEProblem
 from evotorch.neuroevolution.net import count_parameters
 from matplotlib import pyplot as plt
-from tqdm import tqdm, trange
+from tqdm import trange
 
-from core.agent.evo import NeuralAutomataAgent, ConvolutionModel
+from core.agent.evo import NeuralAutomataAgent
 from core.data_init import WaveSequence
 from core.env import Env, Dynamics
 from core.plotting import InteractivePlotter
@@ -72,7 +73,13 @@ def run_agent(env: Env,
     #     }
     # )
 
-    StdOutLogger(searcher)
+    # Create the MLFlow client
+    client = mlflow.tracking.MlflowClient()
+    # Start an MLFlow run to log to
+    run = mlflow.start_run()
+    # Create an MlflowLogger instance
+    _ = MlflowLogger(searcher, client=client, run=run)
+
     searcher.run(epochs)
 
 
@@ -111,8 +118,8 @@ def run_experiment(field_size=156,
 if __name__ == '__main__':
     setup_logging(logging.ERROR)
 
-    run_experiment(field_size=128,
-                   epochs=200,
+    run_experiment(field_size=96,
+                   epochs=100,
                    epoch_iters=5,
                    # dynamics_id='dyn-pred',
                    dynamics_id='st-perlin-wide',
