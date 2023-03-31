@@ -65,23 +65,22 @@ class Env(gym.Env[ObsType, ActType]):
     def __init__(self,
                  field_size: Tuple[int, int],
                  dynamics: Optional[Dynamics] = None):
+        self._field_size = field_size
         self.coordgrid = utils.get_meshgrid(field_size)
-
         self.dynamics = dynamics or Dynamics()
+        self._renderer = EnvRenderer(field_size, field_colors_id='rgb')
+        self._init_data(field_size)
 
+    def _init_data(self, field_size: Tuple[int, int]):
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_const('env_food', 0.5) \
             .with_food_perlin(threshold=1.0, octaves=8) \
             .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
-
-        self.agents = DataInitializer.agents_from_medium(self.medium)
-
-        self._agent_idx = AgentIndexer(field_size, self.agents)
-
         self.buffer_medium = self.medium.copy(deep=True)
 
-        self._renderer = EnvRenderer(field_size, field_colors_id='rgb')
+        self.agents = DataInitializer.agents_from_medium(self.medium)
+        self._agent_idx = AgentIndexer(field_size, self.agents)
 
         self._log_agent = ChannelLogger(self.agents, channels=['x', 'y'], num=self._num_alive_agents)
         # self._log_agent.log_update(self.agents)
@@ -91,6 +90,13 @@ class Env(gym.Env[ObsType, ActType]):
         self.medium = self.buffer_medium
         self.buffer_medium = tmp
         self.buffer_medium[:] = reset_data
+
+    def reset(self, *,
+              seed: Optional[int] = None,
+              options: Optional[dict] = None
+              ) -> Tuple[ObsType, dict]:
+        self._init_data(self._field_size)
+        return self._get_current_obs,{}
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
         """Each substep here leaves the world state valid and ready for the next substep."""
