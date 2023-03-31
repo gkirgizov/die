@@ -51,28 +51,28 @@ def run_agent(env: Env,
         num_actors=1,
     )
 
-    searcher = CMAES(
-        problem,
-        stdev_init=0.01,
-        popsize=10,
-        separable=True,
-    )
-
-    # radius_init = 1.5  # (approximate) radius of initial hypersphere that we will sample from
-    # max_speed = radius_init / 15.  # Rule-of-thumb from the paper
-    # center_learning_rate = max_speed / 2.
-    # searcher = PGPE(
+    # searcher = CMAES(
     #     problem,
-    #     popsize=10,  # For now we use a static population size
-    #     radius_init=radius_init,  # The searcher can be initialised directely with an initial radius, rather than stdev
-    #     center_learning_rate=center_learning_rate,
-    #     stdev_learning_rate=0.1,  # stdev learning rate of 0.1 was used across all experiments
-    #     optimizer="clipup",  # Using the ClipUp optimiser
-    #     optimizer_config={
-    #         'max_speed': max_speed,  # with the defined max speed
-    #         'momentum': 0.9,  # and momentum fixed to 0.9
-    #     }
+    #     stdev_init=0.1,
+    #     popsize=10,
+    #     separable=True,
     # )
+
+    radius_init = 1.5  # (approximate) radius of initial hypersphere that we will sample from
+    max_speed = radius_init / 15.  # Rule-of-thumb from the paper
+    center_learning_rate = max_speed / 2.
+    searcher = PGPE(
+        problem,
+        popsize=10,  # For now we use a static population size
+        radius_init=radius_init,  # The searcher can be initialised directely with an initial radius, rather than stdev
+        center_learning_rate=center_learning_rate,
+        stdev_learning_rate=0.1,  # stdev learning rate of 0.1 was used across all experiments
+        optimizer="clipup",  # Using the ClipUp optimiser
+        optimizer_config={
+            'max_speed': max_speed,  # with the defined max speed
+            'momentum': 0.9,  # and momentum fixed to 0.9
+        }
+    )
 
     # Create the MLFlow client and 'run' object for logging into
     client = mlflow.tracking.MlflowClient()
@@ -86,9 +86,10 @@ def run_agent(env: Env,
     assert isinstance(solution_agent, NeuralAutomataAgent)
 
     # Try running the best solution
+    input('Press Anything to run the best model...')
     plotter = InteractivePlotter.get(env, solution_agent)
     env.reset()
-    reward = run_epoch(solution_agent, iters=epoch_iters*50, plotter=plotter)
+    reward = run_epoch(solution_agent, iters=epoch_iters*100, plotter=plotter)
     print(f'Final reward of the best solution: {reward}')
     return solution_agent
 
@@ -108,7 +109,7 @@ def run_experiment(field_size=156,
     dynamics_choice = {
         'st-perlin': Dynamics(init_agent_ratio=agent_ratio, food_infinite=True),
         'st-perlin-wide': Dynamics(init_agent_ratio=agent_ratio, food_infinite=True,
-                                   rate_decay_chem=0.05, diffuse_sigma=.5),
+                                   rate_decay_chem=0.025, diffuse_sigma=.8),
         'dyn-pred': Dynamics(init_agent_ratio=agent_ratio, food_infinite=False, op_food_flow=wave_flow),
     }
 
@@ -128,8 +129,8 @@ if __name__ == '__main__':
     setup_logging(logging.ERROR)
 
     run_experiment(field_size=96,
-                   epochs=4,
-                   epoch_iters=20,
+                   epochs=1000,
+                   epoch_iters=30,
                    # dynamics_id='dyn-pred',
                    dynamics_id='st-perlin-wide',
                    agent_ratio=0.10,
