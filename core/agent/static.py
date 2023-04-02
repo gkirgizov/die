@@ -1,15 +1,20 @@
-from typing import Tuple
+from typing import Tuple, Dict, Any
 
 from core.agent.base import Agent
 from core.base_types import ActType, ObsType
 from core.data_init import DataInitializer
+from core.utils import save_args
 
 
 class ConstAgent(Agent):
     def __init__(self, delta_xy: Tuple[float, float], deposit: float = 0.):
+        self._init_params = save_args(self.__init__, locals())
         self._data = {'dx': delta_xy[0],
                       'dy': delta_xy[1],
                       'deposit1': deposit}
+
+    def init_params(self) -> Dict[str, Any]:
+        return self._init_params
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
@@ -25,8 +30,12 @@ class ConstAgent(Agent):
 
 class BrownianAgent(Agent):
     def __init__(self, move_scale: float = 0.01, deposit_scale: float = 0.5):
+        self._init_params = save_args(self.__init__, locals())
         self._scale = move_scale
         self._dep_scale = deposit_scale
+
+    def init_params(self) -> Dict[str, Any]:
+        return self._init_params
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs

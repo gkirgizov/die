@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Dict, Any
 
 import numpy as np
 import scipy
@@ -7,7 +7,7 @@ import xarray as da
 from core.agent.base import Agent
 from core.base_types import AgtType, ActType, ObsType
 from core.data_init import DataInitializer
-from core.utils import get_radians, polar2xy, AgentIndexer, discretize, renormalize_radians, xy2polar
+from core.utils import get_radians, polar2xy, AgentIndexer, discretize, renormalize_radians, xy2polar, save_args
 
 
 class GradientAgent(Agent):
@@ -26,6 +26,9 @@ class GradientAgent(Agent):
                  normalized_grad: bool = True,
                  grad_clip: Optional[float] = 1e-5,
                  ):
+        self._init_params = save_args(self.__init__, locals())
+        super().__init__()
+
         self._size = max_agents
         self._rng = np.random.default_rng()
         self._noise_scale = noise_scale
@@ -40,6 +43,9 @@ class GradientAgent(Agent):
         self._direction_rads = get_radians(self._prev_grad)
 
         self._render_grad = None
+
+    def init_params(self) -> Dict[str, Any]:
+        return self._init_params
 
     def _get_some_noise(self):
         ncoords = 2
@@ -148,6 +154,8 @@ class PhysarumAgent(GradientAgent):
                          sense_offset,
                          noise_scale,
                          normalized_grad, grad_clip)
+        self._init_params = save_args(self.__init__, locals())
+
         self._turn_radians = np.radians(turn_angle)
         self._sense_radians = np.radians(sense_angle)
         self._rtol = turn_tolerance
