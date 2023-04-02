@@ -1,5 +1,7 @@
+import io
+import os
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Dict, Union
 
 import numpy as np
 
@@ -13,6 +15,15 @@ class Agent(ABC):
 
     def render(self) -> Sequence[Optional[np.ndarray]]:
         return [None]
+
+    @abstractmethod
+    def save(self, file: Union[str, os.PathLike, io.FileIO]):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def load(cls, file: Union[str, os.PathLike, io.FileIO]):
+        pass
 
     @staticmethod
     def postprocess_action(agents: AgtType, action: ActType) -> ActType:

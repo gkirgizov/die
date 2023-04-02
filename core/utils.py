@@ -1,6 +1,8 @@
+import inspect
 import logging
 import warnings
-from typing import Sequence, Dict
+from copy import deepcopy
+from typing import Sequence, Dict, Callable, Any
 
 import matplotlib
 import numpy as np
@@ -207,3 +209,12 @@ def make_net(problem: NEProblem, solution: Solution) -> nn.Module:
     with th.no_grad():
         net = problem.parameterize_net(parameters)
     return net
+
+
+def save_args(fun: Callable, locs: Dict[str, Any]) -> Dict[str, Any]:
+    """Saves function arguments with values in a dict, including
+    all default parameters. Requires `locals()` to be passed."""
+    sig = inspect.signature(fun)
+    args = {name: deepcopy(locs.get(name, param.default))
+            for name, param in sig.parameters.items()}
+    return args

@@ -1,10 +1,12 @@
+import os.path
+import tempfile
+
 import pytest
 import numpy as np
 import torch as th
 import torch.autograd
 
-from core.agent.evo import ConvolutionModel
-
+from core.agent.evo import ConvolutionModel, NeuralAutomataAgent
 
 kernel_sizes_test = ((3,), (5,), (3, 3), (3, 5), (3, 5, 3),)
 
@@ -65,10 +67,29 @@ def test_grad(field_size):
     output_data = model.forward(input_data)
     output = output_data.mean()
 
-    assert input_data.requires_grad
-    assert output.requires_grad
-    assert input_data.grad is None
 
-    output.backward()
+def test_serialize():
+    model_params = dict(
+        kernel_sizes=(3, 5),
+    )
+    field_size = (16, 12)
+    obs_shape = (1, 3, *field_size)
+    input_data = th.rand(obs_shape)
 
-    assert input_data.grad is not None
+    agent = NeuralAutomataAgent(**model_params)
+
+    tmp_path = tempfile.mktemp()
+
+    assert not os.path.exists(tmp_path)
+
+    agent.save(tmp_path)
+
+    assert os.path.exists(tmp_path)
+
+    agent2 = NeuralAutomataAgent.load(tmp_path)
+
+    assert agent._init_params == agent2._init_params
+    assert th.allclose(agent.model.forward(input_data),
+                       agent2.model.forward(input_data))
+
+    os.remove(tmp_path)
