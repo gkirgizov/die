@@ -1,7 +1,8 @@
 import io
+import json
 import os
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Dict, Union
+from typing import Optional, Sequence, Dict, Union, Any
 
 import numpy as np
 
@@ -11,19 +12,35 @@ from core.base_types import ObsType, ActType, AgtType
 class Agent(ABC):
     @abstractmethod
     def forward(self, obs: ObsType) -> ActType:
+        """Act in the environment given observations."""
         pass
 
     def render(self) -> Sequence[Optional[np.ndarray]]:
+        """Returns a sequence of images for agent visualization."""
         return [None]
 
+    @property
     @abstractmethod
-    def save(self, file: Union[str, os.PathLike, io.FileIO]):
+    def init_params(self) -> Dict[str, Any]:
+        """Returns parameters from which Agent can be reconstructed."""
         pass
 
+    def save(self, file: Union[str, os.PathLike, io.FileIO]):
+        data = json.dumps(self.init_params)
+        if not isinstance(file, io.FileIO):
+            with open(file, 'w') as file:
+                file.write(data)
+        else:
+            file.write(data)
+
     @classmethod
-    @abstractmethod
-    def load(cls, file: Union[str, os.PathLike, io.FileIO]):
-        pass
+    def load(cls, file: Union[str, os.PathLike, io.FileIO]) -> 'Agent':
+        if isinstance(file, io.FileIO):
+            params_data: Dict = json.load(file)
+        else:
+            with open(file, 'r') as f:
+                params_data: Dict = json.load(f)
+        return cls(**params_data)
 
     @staticmethod
     def postprocess_action(agents: AgtType, action: ActType) -> ActType:

@@ -1,7 +1,7 @@
 import io
 import os
 from abc import abstractmethod
-from typing import Sequence, Optional, Union
+from typing import Sequence, Optional, Union, Dict, Any
 
 import numpy as np
 import torch as th
@@ -23,8 +23,7 @@ class TorchAgent(Agent, nn.Module):
 
     def save(self, file: Union[str, os.PathLike, io.FileIO]):
         serialized = dict(
-            params_dict=self._init_params,
-            model_params=self.model._init_params,
+            params_dict=self.init_params,
             model_state=self.model.state_dict(),
         )
         th.save(serialized, file)
@@ -143,6 +142,10 @@ class NeuralAutomataAgent(TorchAgent):
     @property
     def model(self) -> ConvolutionModel:
         return self._model
+
+    @property
+    def init_params(self) -> Dict[str, Any]:
+        return self._init_params
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
