@@ -1,4 +1,7 @@
-from typing import Tuple, Sequence, Optional
+import io
+import os
+from abc import abstractmethod
+from typing import Sequence, Optional, Union
 
 import numpy as np
 import torch as th
@@ -9,7 +12,35 @@ from torch.nn.init import xavier_uniform
 from core.agent.base import Agent
 from core.base_types import ActType, ObsType, DataChannels, MediumType
 from core.data_init import DataInitializer
-from core.utils import AgentIndexer
+from core.utils import AgentIndexer, save_args
+
+
+class TorchAgent(Agent, nn.Module):
+    @property
+    @abstractmethod
+    def model(self) -> nn.Module:
+        pass
+
+    def save(self, file: Union[str, os.PathLike, io.FileIO]):
+        serialized = dict(
+            params_dict=self._init_params,
+            model_params=self.model._init_params,
+            model_state=self.model.state_dict(),
+        )
+        th.save(serialized, file)
+
+    @classmethod
+    def load(cls, file: Union[str, os.PathLike, io.FileIO]):
+        loaded = th.load(file)
+        params_dict = loaded['params_dict']
+        model_state = loaded['model_state']
+        kwargs = {}
+        if 'model_kwargs' in params_dict:
+            kwargs = params_dict['model_kwargs']
+            del params_dict['model_kwargs']
+        agent = cls(**params_dict, **kwargs)
+        agent.model.load_state_dict(model_state)
+        return agent
 
 
 class ConvolutionModel(nn.Module):
@@ -40,7 +71,7 @@ class ConvolutionModel(nn.Module):
         - Use generic NEProblem class with simple eval
         """
         # TODO: agents should have access to their own resource stock
-
+        self._init_params = save_args(self.__init__, locals())
         super().__init__()
         # Determine kernel sizes:
         # - First apply kernels preserving obs shape
@@ -88,7 +119,7 @@ class ConvolutionModel(nn.Module):
         return sense_transform
 
 
-class NeuralAutomataAgent(Agent, nn.Module):
+class NeuralAutomataAgent(TorchAgent):
     """Agent with action mapping based on a neural model."""
     def __init__(self,
                  scale: float = 0.1,
@@ -97,16 +128,21 @@ class NeuralAutomataAgent(Agent, nn.Module):
                  initial_obs: Optional[ObsType] = None,
                  **model_kwargs,
                  ):
+        self._init_params = save_args(self.__init__, locals())
         super().__init__()
         self.obs_channels = list(DataChannels.medium) \
             if with_agent_channel else list(DataChannels.medium[1:])
-        self.model = ConvolutionModel(num_obs_channels=len(self.obs_channels),
-                                      num_act_channels=len(DataChannels.actions),
-                                      **model_kwargs)
+        self._model = ConvolutionModel(num_obs_channels=len(self.obs_channels),
+                                       num_act_channels=len(DataChannels.actions),
+                                       **model_kwargs)
         # And these are coefficients for later scaling in forward() step
         self.action_coefs = th.tensor([scale, scale, deposit]).reshape((-1, 1))
         self._sense_output = th.as_tensor(initial_obs[1].values) \
             if initial_obs else th.ones((1, 3, 2, 2))
+
+    @property
+    def model(self) -> ConvolutionModel:
+        return self._model
 
     def forward(self, obs: ObsType) -> ActType:
         agents, medium = obs
@@ -114,7 +150,7 @@ class NeuralAutomataAgent(Agent, nn.Module):
 
         # Transform to Tensor, call internal tensor model, transform back to XArray
         sense_tensor = self.medium2tensor(self.obs_channels, medium)
-        sense_tensor = self.model(sense_tensor)
+        sense_tensor = self._model.forward(sense_tensor)
         self._sense_output = sense_tensor
 
         # self._sense_output = self.tensor2medium(medium, sense_tensor)
