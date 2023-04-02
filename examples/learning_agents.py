@@ -1,7 +1,9 @@
 import logging
+import os
 
 import mlflow
 import numpy as np
+from IPython.utils.tz import utcnow
 from evotorch.algorithms import CMAES, PGPE
 from evotorch.logging import StdOutLogger, PandasLogger, MlflowLogger
 from evotorch.neuroevolution import NEProblem
@@ -85,12 +87,25 @@ def run_agent(env: Env,
     solution_agent = make_net(problem, solution=searcher.status["pop_best"])
     assert isinstance(solution_agent, NeuralAutomataAgent)
 
+    # Save the agent
+    models_dir = 'saved_models'
+    agent_id = f'{agent.__class__.__name__.lower()}'
+    solver_id = f'{searcher.__class__.__name__.lower()}_epochs{epochs}x{epoch_iters}'
+    timestamp = utcnow().strftime('%Y%m%d-%H%M%S')
+    agent_dir = f'{models_dir}/{agent_id}_{solver_id}'
+    os.makedirs(agent_dir, exist_ok=True)
+    agent_file = f'{agent_dir}/{timestamp}.pt'
+
+    print(f'Saving the agent to: {agent_file}...')
+    solution_agent.save(agent_file)
+
     # Try running the best solution
     input('Press Anything to run the best model...')
     plotter = InteractivePlotter.get(env, solution_agent)
     env.reset()
     reward = run_epoch(solution_agent, iters=epoch_iters*100, plotter=plotter)
     print(f'Final reward of the best solution: {reward}')
+
     return solution_agent
 
 
