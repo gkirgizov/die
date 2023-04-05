@@ -133,27 +133,6 @@ class Env(gym.Env[ObsType, ActType]):
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
         return self._renderer.render(self.medium, self.agents)
 
-    def render_animation(self,
-                         action_function: ActionFunc,
-                         filename: Optional[str] = None,
-                         num_frames: int = 100) -> FuncAnimation:
-        """Return matplotlib's animation and optionally saves it to a file."""
-        def frame_step(frame):
-            action = action_function(self._get_current_obs)
-            self.step(action)
-            # TODO: upd usage
-            self._drawer.update(self.medium, self.agents)
-
-        animate = FuncAnimation(
-            fig=self._drawer.fig,
-            func=frame_step,
-            save_count=num_frames,
-            interval=40,
-        )
-        if filename:
-            animate.save(filename, fps=10, dpi=100)
-        return animate
-
     def _medium_diffuse_decay(self):
         """Applies per-channel diffusion, channel-specific."""
         chem_ind = dict(channel='chem1')

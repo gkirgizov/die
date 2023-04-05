@@ -4,6 +4,7 @@ from core.agent.static import BrownianAgent
 from core.agent.gradient import PhysarumAgent
 from core.agent.base import Agent
 from core.env import Env, Dynamics
+from core.plotting import render_animation
 from core.utils import setup_logging
 
 
@@ -17,7 +18,7 @@ def record(agent: Agent,
     print('Starting animation...')
 
     env = Env(field_size, Dynamics(**dynamics_params))
-    env.render_animation(agent.forward, str(filepath), num_frames=iters)
+    render_animation(env, agent, str(filepath), num_frames=iters)
     print('Saved animation to file:', filepath)
 
 

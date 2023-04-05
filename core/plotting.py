@@ -1,8 +1,9 @@
 from itertools import chain
-from typing import Tuple, Sequence
+from typing import Tuple, Sequence, Optional
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
 from matplotlib.image import AxesImage
 
 from core.agent.base import Agent
@@ -103,5 +104,25 @@ class InteractivePlotter:
         self.fig.canvas.draw_idle()
         self.fig.canvas.start_event_loop(0.001)
 
-        # plt.draw()
-        # plt.pause(0.01)
+
+def render_animation(env: Env,
+                     agent: Agent,
+                     filename: Optional[str] = None,
+                     num_frames: int = 100) -> FuncAnimation:
+    """Return matplotlib's animation and optionally saves it to a file."""
+    plotter = InteractivePlotter.get(env, agent)
+
+    def frame_step(frame):
+        action = agent.forward(env._get_current_obs)
+        obs, reward, _, _, stats = env.step(action)
+        plotter.update()
+
+    animate = FuncAnimation(
+        fig=plotter.fig,
+        func=frame_step,
+        save_count=num_frames,
+        interval=40,
+    )
+    if filename:
+        animate.save(filename, fps=10, dpi=100)
+    return animate
