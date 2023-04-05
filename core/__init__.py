@@ -20,7 +20,7 @@
 **Possible Research Vectors**
 - It can be research about Artificial Life:
   how energetic (life/death) pressures influence patterns?
-- Learnable Robust Distributed Computing in the form of Signal processing
+- **Learnable Robust Distributed Computing in the form of Signal processing**
   FPGA + DSP in Edge AI for custom image processing tasks.
   - Research SoA: how difficult inference is?
 
@@ -28,15 +28,15 @@
   So then I can try making agents position
   a separate output of the model run on top of kernel-processed image,
   fed-back into...
+  What an experiment for checking this?
+  How and where can this help? Dynamic, smooth and 'precious' image attention?
 - Can prediction be temporally deep? (like learning temporal models of env)
-- Measuring system complexity through some entropic-dynamics metrics
 - Learning to Communicate:
     - Finding correlation between medium capacity for message passing and system complexity
     - Provisioning some potential to establish better comm channels -- like a winning strategy.
 - Learning *dynamic* model of environment in Cellular Automata
   Pushing agent to implicitly model/predict dynamics of the medium
   Modeling operators ('change') instead of patterns ('things') in the world.
-
   How to compare it with NNs?
   Maybe with dynamic medium operators (diffusion/decay) that could work.
   Agents will learn the model, while NNs will not.
@@ -59,11 +59,12 @@ Publish
 - [x] compress gifs
 - [ ] make Env the gym.Env
 - [ ] few tests & CI
+- [ ] upd readme & gifs with Neural CA
 - [ ] **Resolve question with multi-agent interface??**
 fixes for usability
 - [x] color plotting
 - [ ] max_agents in agents must be broadcastable with env medium (cut size)
-- [ ] return stats properly in a final dict; not in logging (tqdm err-s)
+- [x] return stats properly in a final dict; not in logging (tqdm err-s)
 Concept:
 - [ ] Resolve & put to README: is it single-agent env? is it multi-agent? single-agent distributed? can I have multi-agent env here?
     - see: https://pettingzoo.farama.org/api/parallel/
@@ -213,7 +214,7 @@ Necessary core
             - [x] **visualise learning dynamics (reward)**
                 - [x] try MLFlow
             - [x] take the best model & run it
-            - [ ] make checkpoints serialize
+            - [x] make checkpoints serialize
             - [ ] try gpu (problem: inputs must be on GPU)
 
             - [ ] NB: **They're Very Sensitive to Initial Conditions**
