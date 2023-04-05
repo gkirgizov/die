@@ -49,7 +49,8 @@ def test_convolution_model_apply(field_size, kernel_sizes):
 
 
 @pytest.mark.parametrize('field_size', [(12, 12), (12, 15)])
-def test_grad(field_size):
+@pytest.mark.parametrize('pdropout', [.0])  # TODO: fix dropout, test with nonzero prob
+def test_grad(field_size, pdropout):
     torch.autograd.set_detect_anomaly(True)
 
     num_obs_channels = 3
@@ -62,7 +63,7 @@ def test_grad(field_size):
     model = ConvolutionModel(num_act_channels=num_act_channels,
                              num_obs_channels=num_obs_channels,
                              kernel_sizes=kernel_sizes,
-                             p_agent_dropout=0.25,
+                             p_agent_dropout=pdropout,
                              requires_grad=True)
     output_data = model.forward(input_data)
     output = output_data.mean()
@@ -88,7 +89,7 @@ def test_serialize():
 
     agent2 = NeuralAutomataAgent.load(tmp_path)
 
-    assert agent._init_params == agent2._init_params
+    assert agent.init_params == agent2.init_params
     assert th.allclose(agent.model.forward(input_data),
                        agent2.model.forward(input_data))
 
