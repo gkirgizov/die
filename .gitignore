@@ -127,3 +127,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Experiment outputs
+runs/
+samples/
+saved_models/
+mlruns/
+mlartifacts/
+*.db
