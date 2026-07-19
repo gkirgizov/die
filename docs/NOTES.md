@@ -378,3 +378,33 @@ Deviations from the plan above, each forced by a verified fact:
 
 Consequence worth remembering: a JAX-trained agent *replays* in the xarray env, so training
 and replay physics differ slightly at collision cells.
+
+### Apple GPU (Metal): tested, not viable (Jul 2026)
+
+Tried on an M5 Pro (20 GPU cores, Metal 4). `jax-metal` is the only option and it does not
+work for this workload. Three independent blockers, in order of severity:
+
+1. **Binary incompatibility with the current stack.** `jax-metal` 0.1.1 (Oct 2024, ~21 months
+   stale, no release since) cannot run on jax 0.11 at all — even `jnp.ones` dies with
+   `unknown attribute code: 22 ... bytecode version 6 produced by StableHLO_v1.14.0`. The
+   plugin's PJRT binary predates the IR jax now emits.
+2. **Irreconcilable pins.** evosax 0.2 requires `jax>=0.5`; jax-metal is only usable around
+   its contemporary `jax==0.4.34`. There is no version satisfying both, so using Metal would
+   mean downgrading the whole stack ~2 years *and* rewriting the backend against the old
+   pre-0.2 evosax API.
+3. **The core pattern deadlocks anyway.** Even after downgrading to jax 0.4.34, where every
+   individual op we need works on Metal (scatter-add/max, wrap-pad, convolve, conv, scan,
+   vmap — all verified OK), the actual workload hangs. Isolated to a single construct:
+
+   | construct (64x64 field)                    | CPU    | Metal          |
+   |--------------------------------------------|--------|----------------|
+   | scan 50 x dynamic-index scatter            | 0.02 s | 0.02 s OK      |
+   | **vmap(16) over** that same scan           | 0.13 s | hangs (>300 s, 0% CPU) |
+
+   Batched scatter with data-dependent indices inside a scan is exactly what population
+   evaluation *is* here (agents deposit at their own moving positions, vmapped over the
+   population), so this is not something to code around.
+
+Conclusion: stay on CPU, where the port already gives ~30x and an M-series CPU is fast.
+Real GPU scaling means CUDA on Linux — untested, and worth revisiting only at popsize >= 100
+or field sizes well beyond 96^2, where device parallelism can actually pay for itself.
