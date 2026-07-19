@@ -1,12 +1,10 @@
 import os.path
-import tempfile
 
 import pytest
-import numpy as np
 import torch as th
 import torch.autograd
 
-from core.agent.evo import ConvolutionModel, NeuralAutomataAgent
+from die.agents.neural import ConvolutionModel, NeuralAutomataAgent
 
 kernel_sizes_test = ((3,), (5,), (3, 3), (3, 5), (3, 5, 3),)
 
@@ -67,9 +65,15 @@ def test_grad(field_size, pdropout):
                              requires_grad=True)
     output_data = model.forward(input_data)
     output = output_data.mean()
+    output.backward()
+
+    conv_weights = [kernel.weight for kernel in model.kernels if hasattr(kernel, 'weight')]
+    assert conv_weights
+    assert all(weight.grad is not None for weight in conv_weights)
+    assert input_data.grad is not None
 
 
-def test_serialize():
+def test_serialize(tmp_path):
     model_params = dict(
         kernel_sizes=(3, 5),
     )
@@ -79,18 +83,17 @@ def test_serialize():
 
     agent = NeuralAutomataAgent(**model_params)
 
-    tmp_path = tempfile.mktemp()
+    model_path = tmp_path / 'agent.pt'
 
-    assert not os.path.exists(tmp_path)
+    assert not os.path.exists(model_path)
 
-    agent.save(tmp_path)
+    agent.save(model_path)
 
-    assert os.path.exists(tmp_path)
+    assert os.path.exists(model_path)
 
-    agent2 = NeuralAutomataAgent.load(tmp_path)
+    agent2 = NeuralAutomataAgent.load(model_path)
 
     assert agent.init_params == agent2.init_params
     assert th.allclose(agent.model.forward(input_data),
                        agent2.model.forward(input_data))
 
-    os.remove(tmp_path)

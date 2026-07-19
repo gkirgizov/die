@@ -1,19 +1,16 @@
 import inspect
 import logging
 import warnings
+from collections.abc import Callable, Sequence
 from copy import deepcopy
-from typing import Sequence, Dict, Callable, Any
+from typing import Any
 
-import matplotlib
 import numpy as np
+import torch as th
 import xarray
 import xarray as da
-import torch as th
-import torch.nn as nn
-from evotorch import Solution
-from evotorch.neuroevolution import NEProblem
 
-from core.base_types import MediumType, AgtType, FieldIdx, ActType
+from die.types import ActType, AgtType, FieldIdx, MediumType
 
 
 class AgentIndexer:
@@ -196,22 +193,15 @@ def np_info(grad):
 def setup_logging(level=logging.INFO, disable_warnings: bool = False):
     # setup logging
     logging.basicConfig(level=level)
-    # disable matplotlib warnings, mabye put that into InteractivePlotter
-    matplotlib.pyplot.set_loglevel('error')
+    # disable matplotlib warnings; lazy import keeps matplotlib out of headless paths
+    import matplotlib.pyplot as plt
+    plt.set_loglevel('error')
     # disable extra warnings not controlled by logging
     if disable_warnings or level > logging.WARNING:
         warnings.filterwarnings('ignore')
 
 
-def make_net(problem: NEProblem, solution: Solution) -> nn.Module:
-    """No-copying version of ``evotorch.NEProblem.make_net()``."""
-    parameters = solution.access_values(keep_evals=True)
-    with th.no_grad():
-        net = problem.parameterize_net(parameters)
-    return net
-
-
-def save_args(fun: Callable, locs: Dict[str, Any]) -> Dict[str, Any]:
+def save_args(fun: Callable, locs: dict[str, Any]) -> dict[str, Any]:
     """Saves function arguments with values in a dict, including
     all default parameters. Requires `locals()` to be passed."""
     sig = inspect.signature(fun)

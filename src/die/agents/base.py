@@ -2,11 +2,12 @@ import io
 import json
 import os
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Dict, Union, Any
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
-from core.base_types import ObsType, ActType, AgtType
+from die.types import ActType, AgtType, ObsType
 
 
 class Agent(ABC):
@@ -15,17 +16,17 @@ class Agent(ABC):
         """Act in the environment given observations."""
         pass
 
-    def render(self) -> Sequence[Optional[np.ndarray]]:
+    def render(self) -> Sequence[np.ndarray | None]:
         """Returns a sequence of images for agent visualization."""
         return [None]
 
     @property
     @abstractmethod
-    def init_params(self) -> Dict[str, Any]:
+    def init_params(self) -> dict[str, Any]:
         """Returns parameters from which Agent can be reconstructed."""
         pass
 
-    def save(self, file: Union[str, os.PathLike, io.FileIO]):
+    def save(self, file: str | os.PathLike | io.FileIO):
         data = json.dumps(self.init_params)
         if not isinstance(file, io.FileIO):
             with open(file, 'w') as file:
@@ -34,12 +35,12 @@ class Agent(ABC):
             file.write(data)
 
     @classmethod
-    def load(cls, file: Union[str, os.PathLike, io.FileIO]) -> 'Agent':
+    def load(cls, file: str | os.PathLike | io.FileIO) -> 'Agent':
         if isinstance(file, io.FileIO):
-            params_data: Dict = json.load(file)
+            params_data: dict = json.load(file)
         else:
-            with open(file, 'r') as f:
-                params_data: Dict = json.load(f)
+            with open(file) as f:
+                params_data: dict = json.load(f)
         return cls(**params_data)
 
     @staticmethod

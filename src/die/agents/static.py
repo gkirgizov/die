@@ -1,19 +1,21 @@
-from typing import Tuple, Dict, Any
+from typing import Any
 
-from core.agent.base import Agent
-from core.base_types import ActType, ObsType
-from core.data_init import DataInitializer
-from core.utils import save_args
+from die.agents.base import Agent
+from die.data_init import DataInitializer
+from die.types import ActType, ObsType
+from die.utils import save_args
 
 
 class ConstAgent(Agent):
-    def __init__(self, delta_xy: Tuple[float, float], deposit: float = 0.):
+    def __init__(self, delta_xy: tuple[float, float], deposit: float = 0.):
+        delta_xy = tuple(delta_xy)  # normalize for JSON save/load round-trip
         self._init_params = save_args(self.__init__, locals())
         self._data = {'dx': delta_xy[0],
                       'dy': delta_xy[1],
                       'deposit1': deposit}
 
-    def init_params(self) -> Dict[str, Any]:
+    @property
+    def init_params(self) -> dict[str, Any]:
         return self._init_params
 
     def forward(self, obs: ObsType) -> ActType:
@@ -34,7 +36,8 @@ class BrownianAgent(Agent):
         self._scale = move_scale
         self._dep_scale = deposit_scale
 
-    def init_params(self) -> Dict[str, Any]:
+    @property
+    def init_params(self) -> dict[str, Any]:
         return self._init_params
 
     def forward(self, obs: ObsType) -> ActType:

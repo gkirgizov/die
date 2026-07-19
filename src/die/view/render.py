@@ -1,14 +1,21 @@
-from typing import Tuple, Sequence, Callable
+from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING
+
+import matplotlib
 import numpy as np
-from matplotlib import cm as cm
 
-from core.base_types import MediumType, AgtType
+from die.types import AgtType, MediumType
+
+if TYPE_CHECKING:
+    from die.agents.base import Agent
+    from die.env import Env
 
 
 class FieldTrace:
     def __init__(self,
-                 field_size: Tuple[int, int],
+                 field_size: tuple[int, int],
                  trace_steps: int = 8,
                  ):
         self._decay = 1 - 1 / trace_steps
@@ -44,7 +51,7 @@ class RendererBase:
 
     @staticmethod
     def _colorify(monochrome_data: np.array, cmap: str ='gray'):
-        return cm.get_cmap(cmap)(monochrome_data)
+        return matplotlib.colormaps[cmap](monochrome_data)
 
     @staticmethod
     def _set_colors(field_colors_id) -> Callable:
@@ -54,16 +61,19 @@ class RendererBase:
             color = RendererBase.field_colors.get(field_colors_id)
         if color is not None:
             color /= np.linalg.norm(color)
-            rgb_mapper=lambda rgb: np.cross(color, rgb, axisb=-1)
+
+            def rgb_mapper(rgb):
+                return np.cross(color, rgb, axisb=-1)
         else:
-            rgb_mapper=lambda rgb: rgb
+            def rgb_mapper(rgb):
+                return rgb
         return rgb_mapper
 
-    def __init__(self, field_size: Tuple[int, int]):
+    def __init__(self, field_size: tuple[int, int]):
         self.field_size = field_size
 
     @property
-    def img_shape(self) -> Tuple[int, int]:
+    def img_shape(self) -> tuple[int, int]:
         width, height = self.field_size
         img_shape = (height, width)
         return img_shape
@@ -75,7 +85,7 @@ class RendererBase:
 
 class EnvRenderer(RendererBase):
     def __init__(self,
-                 field_size: Tuple[int, int],
+                 field_size: tuple[int, int],
                  is_trace_colored: bool = True,
                  field_colors_id: str = 'rgb'):
         self._is_trace_colored = is_trace_colored
@@ -93,7 +103,6 @@ class EnvRenderer(RendererBase):
     def _upd_img_medium(self, medium: MediumType) -> np.ndarray:
         """Returns RGB/RGBA image ready for imshow"""
         # transpose dimensions so that channels dim would be the last
-        ones_channel = np.ones(self.img_shape)
         medium_data_rgb = np.stack([medium.sel(channel='agents'),
                                     medium.sel(channel='env_food'),
                                     medium.sel(channel='chem1'),
@@ -130,3 +139,67 @@ class EnvRenderer(RendererBase):
                                     alive_mask,
                                     ], axis=-1)
         return agents_data_rgb
+
+
+class FrameSource:
+    """Produces the visual frames for an (env, agent) pair.
+
+    Owns the (stateful) :class:`EnvRenderer` -- e.g. the decaying agent
+    trace -- so one instance should serve one simulation run at a time.
+    """
+
+    def __init__(self, env: Env, agent: Agent, field_colors_id: str = 'rgb'):
+        self._env = env
+        self._agent = agent
+        field_size = tuple(env.medium.shape[1:])
+        self._renderer = EnvRenderer(field_size, field_colors_id=field_colors_id)
+
+    def frames(self) -> list[np.ndarray]:
+        env_frames = self._renderer.render(self._env.medium, self._env.agents)
+        agent_frames = self._agent.render()
+        return [frame for frame in [*env_frames, *agent_frames] if frame is not None]
+
+    __call__ = frames
+
+
+def to_uint8_rgb(frame: np.ndarray) -> np.ndarray:
+    """Converts a float [0, 1] RGB/RGBA (or grayscale) image to uint8 RGB.
+
+    RGBA images are composited onto a black background.
+    """
+    img = np.asarray(frame, dtype=float)
+    if img.ndim == 2:
+        img = np.stack([img] * 3, axis=-1)
+    if img.shape[-1] == 4:
+        rgb, alpha = img[..., :3], img[..., 3:4]
+        img = rgb * alpha
+    return (np.clip(img, 0., 1.) * 255).astype(np.uint8)
+
+
+def _resize_nearest(img: np.ndarray, height: int, width: int) -> np.ndarray:
+    if img.shape[:2] == (height, width):
+        return img
+    row_idx = (np.arange(height) * img.shape[0] / height).astype(int)
+    col_idx = (np.arange(width) * img.shape[1] / width).astype(int)
+    return img[row_idx][:, col_idx]
+
+
+def compose_grid(frames: Sequence[np.ndarray], ncols: int = 2) -> np.ndarray:
+    """Tiles frames into a single uint8 RGB image grid.
+
+    Frames of differing sizes (e.g. an agent's 1x1 fallback frame) are
+    nearest-neighbor resized to the largest frame size.
+    """
+    if not frames:
+        raise ValueError('No frames to compose')
+    tiles = [to_uint8_rgb(frame) for frame in frames]
+    height = max(tile.shape[0] for tile in tiles)
+    width = max(tile.shape[1] for tile in tiles)
+    tiles = [_resize_nearest(tile, height, width) for tile in tiles]
+
+    ncols = min(ncols, len(tiles))
+    blank = np.zeros((height, width, 3), dtype=np.uint8)
+    while len(tiles) % ncols != 0:
+        tiles.append(blank)
+    rows = [np.hstack(tiles[i:i + ncols]) for i in range(0, len(tiles), ncols)]
+    return np.vstack(rows)

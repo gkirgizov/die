@@ -1,5 +1,7 @@
+# DIE — Research Notes
 
-"""
+Extracted from the original `core/__init__.py` module docstring (the project design notebook).
+
 
 **Research Aims**
 - Let agents learn effective Operator dynamics of medium for prediction and their life
@@ -329,5 +331,20 @@ Target parameters for defining baseline:
 * Couplings:
 - ...
 
-"""
 
+----------
+
+## Modernization roadmap (added 2026-07)
+
+Stack research verdict (verified Jul 2026): the accepted stack for NCA/ALife research is JAX
+(see CAX, ICLR 2025). The current trainer keeps evotorch 0.6.1 (semi-dormant but functional,
+pinned) behind a generation-granular `SearcherBackend` seam. The intended follow-up:
+
+- Port the env core to JAX: pure fixed-shape array functions, `vmap` over population,
+  `scan` over rollout steps, `dm-pix` for gaussian diffusion, fixed `max_agents` + alive-mask
+  for dynamic populations. Expected ~10-50x on CPU from XLA fusion; more with CUDA at popsize >= 100.
+- Slot `evosax` (has PGPE + ClipUp via optax) into the existing `SearcherBackend` seam.
+- References: CAX (https://github.com/maxencefaldor/cax) for NCA/Lenia patterns,
+  QDax for MAP-Elites experiments once QD beckons.
+- Vetoed: EvoJAX (archived), nevergrad (dormant), EvoX (active but device-batch-only eval,
+  no PGPE — wrong shape for this project).

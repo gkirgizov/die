@@ -1,23 +1,21 @@
+from collections.abc import Hashable, Sequence
 from itertools import cycle
 from numbers import Number
-from numbers import Number
-from typing import Tuple, Optional, List, Iterable
-from typing import Union, Sequence, Hashable
 
 import numpy as np
 import xarray as da
 from perlin_noise import PerlinNoise
 
-from core import utils
-from core.base_types import Channels, DataChannels, ObsType, ActType, MediumType, AgtType, FoodOperator
-from core.utils import get_agents_by_medium
+from die import utils
+from die.types import ActType, AgtType, Channels, DataChannels, FoodOperator, MediumType
+from die.utils import get_agents_by_medium
 
 
 class FieldSequence(Sequence[np.ndarray]):
     def __init__(self,
                  field_size: Sequence[int],
                  dt: float = 0.01,
-                 t_bounds: Tuple[float, float] = (0, 10),
+                 t_bounds: tuple[float, float] = (0, 10),
                  ):
         self._size = field_size
         self._tbounds = t_bounds
@@ -56,7 +54,7 @@ class PerlinNoiseSequence(FieldSequence):
     def __init__(self,
                  field_size: Sequence[int],
                  dt: float = 0.01,
-                 t_bounds: Tuple[float, float] = (0, 1),
+                 t_bounds: tuple[float, float] = (0, 1),
                  octaves: int = 8):
         super().__init__(field_size, dt, t_bounds)
         self._noise = PerlinNoise(octaves=octaves)
@@ -92,11 +90,10 @@ class WaveSequence(FieldSequence):
 class DataInitializer:
 
     @staticmethod
-    def init_field_array(field_size: Tuple[int, int],
+    def init_field_array(field_size: tuple[int, int],
                          channels: Sequence[Hashable],
-                         name: Optional[str] = None,
-                         init_data: Optional[Union[Number, np.ndarray]] = None) -> MediumType:
-        shape = (len(channels), *field_size)
+                         name: str | None = None,
+                         init_data: Number | np.ndarray | None = None) -> MediumType:
         xs = np.linspace(0, 1, field_size[0])
         ys = np.linspace(0, 1, field_size[1])
 
@@ -114,8 +111,8 @@ class DataInitializer:
     @staticmethod
     def init_agential_array(num_agents: int,
                             channels: Sequence[Hashable],
-                            name: Optional[str] = None,
-                            init_data: Optional[Union[Number, np.ndarray]] = None) -> da.DataArray:
+                            name: str | None = None,
+                            init_data: Number | np.ndarray | None = None) -> da.DataArray:
         """Creates flat int-indexed array"""
         index = np.arange(0, num_agents)
         if init_data is None:
@@ -169,10 +166,10 @@ class DataInitializer:
         return (b-a) * np.random.random_sample(size).round(3) + a
 
     def __init__(self,
-                 field_size: Tuple[int, int],
-                 channels: Optional[Channels] = None,
-                 name: Optional[str] = None,
-                 mask: Union[np.ndarray, float] = 1.):
+                 field_size: tuple[int, int],
+                 channels: Channels | None = None,
+                 name: str | None = None,
+                 mask: np.ndarray | float = 1.):
         self._size = field_size
         self._channels = {chan: np.zeros(field_size) for chan in channels or ()}
         self._name = name
@@ -212,7 +209,7 @@ class DataInitializer:
         return self
 
     def with_const(self, channel: str, value=0.):
-        self._channels[channel] = np.full(self._size, value, dtype=np.float)
+        self._channels[channel] = np.full(self._size, value, dtype=float)
         return self
 
     def with_noise(self, channel: str, a=0, b=1):
@@ -238,14 +235,14 @@ class DataInitializer:
     def build_numpy(self) -> np.ndarray:
         return np.stack(list(self._channels.values()))
 
-    def build(self, name: Optional[str] = None) -> MediumType:
+    def build(self, name: str | None = None) -> MediumType:
         data = self.build_numpy() * self._static_mask
         return DataInitializer.init_field_array(field_size=self._size,
                                                 channels=self._channels,
                                                 name=name,
                                                 init_data=data)
 
-    def build_agents(self, name: Optional[str] = None) -> MediumType:
+    def build_agents(self, name: str | None = None) -> MediumType:
         data = self.build_numpy() * self._static_mask
         return DataInitializer.init_agential_array(num_agents=self._size,
                                                    channels=self._channels,

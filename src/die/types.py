@@ -1,4 +1,4 @@
-from typing import Callable, Union, Sequence, Hashable, Tuple, Dict
+from collections.abc import Callable, Hashable, Sequence
 
 import numpy as np
 import xarray as da
@@ -8,13 +8,13 @@ import xarray as da
 ActType = da.DataArray
 AgtType = da.DataArray  # n-channel 1d-array
 MediumType = da.DataArray
-ObsType = Tuple[AgtType, MediumType]
-FieldIdx = Dict[str, da.DataArray]  # pointwise indexer of MediumType
+ObsType = tuple[AgtType, MediumType]
+FieldIdx = dict[str, da.DataArray]  # pointwise indexer of MediumType
 
 ActionFunc = Callable[[ObsType], ActType]
 
 
-Array = Union[np.ndarray, da.DataArray]
+Array = np.ndarray | da.DataArray
 Array1C = Array  # Single-channel 2D array
 MaskType = Array1C
 CostType = Array1C

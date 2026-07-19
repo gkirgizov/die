@@ -1,18 +1,19 @@
 import io
 import os
 from abc import abstractmethod
-from typing import Sequence, Optional, Union, Dict, Any
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import torch as th
 import xarray as xa
 from torch import nn
-from torch.nn.init import xavier_uniform
+from torch.nn.init import xavier_uniform_
 
-from core.agent.base import Agent
-from core.base_types import ActType, ObsType, DataChannels, MediumType
-from core.data_init import DataInitializer
-from core.utils import AgentIndexer, save_args
+from die.agents.base import Agent
+from die.data_init import DataInitializer
+from die.types import ActType, DataChannels, MediumType, ObsType
+from die.utils import AgentIndexer, save_args
 
 
 class TorchAgent(Agent, nn.Module):
@@ -21,7 +22,7 @@ class TorchAgent(Agent, nn.Module):
     def model(self) -> nn.Module:
         pass
 
-    def save(self, file: Union[str, os.PathLike, io.FileIO]):
+    def save(self, file: str | os.PathLike | io.FileIO):
         serialized = dict(
             params_dict=self.init_params,
             model_state=self.model.state_dict(),
@@ -29,7 +30,7 @@ class TorchAgent(Agent, nn.Module):
         th.save(serialized, file)
 
     @classmethod
-    def load(cls, file: Union[str, os.PathLike, io.FileIO]):
+    def load(cls, file: str | os.PathLike | io.FileIO):
         loaded = th.load(file)
         params_dict = loaded['params_dict']
         model_state = loaded['model_state']
@@ -107,14 +108,15 @@ class ConvolutionModel(nn.Module):
     def init_weights(self):
         for kernel in self.kernels:
             if hasattr(kernel, 'weight'):
-                xavier_uniform(kernel.weight)
+                xavier_uniform_(kernel.weight)
 
     def forward(self, input: th.Tensor) -> th.Tensor:
         sense_transform = self.kernels(input)
         # NB: dropout can have no effect if it drops only dead cells
         output_shape = input.shape[2:]
         dropout_mask = self.agent_dropout(th.ones(output_shape))
-        sense_transform *= dropout_mask
+        # NB: non-inplace multiply -- inplace breaks autograd through the Tanh output
+        sense_transform = sense_transform * dropout_mask
         return sense_transform
 
 
@@ -124,7 +126,7 @@ class NeuralAutomataAgent(TorchAgent):
                  scale: float = 0.1,
                  deposit: float = 1.0,
                  with_agent_channel: bool = True,
-                 initial_obs: Optional[ObsType] = None,
+                 initial_obs: ObsType | None = None,
                  **model_kwargs,
                  ):
         self._init_params = save_args(self.__init__, locals())
@@ -144,7 +146,7 @@ class NeuralAutomataAgent(TorchAgent):
         return self._model
 
     @property
-    def init_params(self) -> Dict[str, Any]:
+    def init_params(self) -> dict[str, Any]:
         return self._init_params
 
     def forward(self, obs: ObsType) -> ActType:

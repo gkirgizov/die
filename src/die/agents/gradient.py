@@ -1,13 +1,22 @@
-from typing import Optional, Sequence, Dict, Any
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import scipy
 import xarray as da
 
-from core.agent.base import Agent
-from core.base_types import AgtType, ActType, ObsType
-from core.data_init import DataInitializer
-from core.utils import get_radians, polar2xy, AgentIndexer, discretize, renormalize_radians, xy2polar, save_args
+from die.agents.base import Agent
+from die.data_init import DataInitializer
+from die.types import ActType, AgtType, ObsType
+from die.utils import (
+    AgentIndexer,
+    discretize,
+    get_radians,
+    polar2xy,
+    renormalize_radians,
+    save_args,
+    xy2polar,
+)
 
 
 class GradientAgent(Agent):
@@ -24,13 +33,14 @@ class GradientAgent(Agent):
                  sense_offset: float = 0.,
                  noise_scale: float = 0.025,  # is measured as fraction of 'scale'
                  normalized_grad: bool = True,
-                 grad_clip: Optional[float] = 1e-5,
+                 grad_clip: float | None = 1e-5,
+                 seed: int | None = None,
                  ):
         self._init_params = save_args(self.__init__, locals())
         super().__init__()
 
         self._size = max_agents
-        self._rng = np.random.default_rng()
+        self._rng = np.random.default_rng(seed)
         self._noise_scale = noise_scale
         self._scale = scale
         self._deposit = deposit
@@ -44,7 +54,8 @@ class GradientAgent(Agent):
 
         self._render_grad = None
 
-    def init_params(self) -> Dict[str, Any]:
+    @property
+    def init_params(self) -> dict[str, Any]:
         return self._init_params
 
     def _get_some_noise(self):
@@ -102,7 +113,8 @@ class GradientAgent(Agent):
 
         # Compute chemical gradient with custom processing
         grad_field = self._get_gradient(chemical)
-        grad_per_agent = idx.field_by_agents(grad_field, only_alive=False, offset=self._sense_offset)
+        grad_per_agent = idx.field_by_agents(grad_field, only_alive=False,
+                                             offset=self._sense_offset)
         grad_per_agent = self._process_gradient(grad_per_agent)
         grad_per_agent = self._process_momentum(grad_per_agent)
 
@@ -144,16 +156,18 @@ class PhysarumAgent(GradientAgent):
                  sense_offset: float = 0.03,
                  noise_scale: float = 0.0,
                  normalized_grad: bool = True,
-                 grad_clip: Optional[float] = 1e-5,
+                 grad_clip: float | None = 1e-5,
                  turn_angle: int = 30,
                  sense_angle: int = 90,
-                 turn_tolerance: float = 0.1,  # relative (to turn angle) tolerance for definite turn
+                 turn_tolerance: float = 0.1,  # tolerance for definite turn, rel. to turn angle
+                 seed: int | None = None,
                  ):
         super().__init__(max_agents,
                          scale, deposit, inertia,
                          sense_offset,
                          noise_scale,
-                         normalized_grad, grad_clip)
+                         normalized_grad, grad_clip,
+                         seed)
         self._init_params = save_args(self.__init__, locals())
 
         self._turn_radians = np.radians(turn_angle)
@@ -178,7 +192,7 @@ class PhysarumAgent(GradientAgent):
         undetermined_turn = np.isclose(0, dir_delta, rtol=1e-2, atol=atol)
         unseen_grad = abs(dir_delta) > self._sense_radians
         undetermined = undetermined_grad | undetermined_turn | unseen_grad
-        rand_choice = (np.random.randint(0, 2, undetermined.shape) - 0.5) * 2
+        rand_choice = (self._rng.integers(0, 2, undetermined.shape) - 0.5) * 2
 
         # Turn right or left, except for undetermined values where random turn is made
         dir_delta *= np.logical_not(undetermined)
