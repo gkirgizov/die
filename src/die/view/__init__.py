@@ -1,6 +1,7 @@
 from die.view.interactive import InteractivePlotter, InteractiveViewObserver
 from die.view.record import AnimationRecorder
 from die.view.render import (
+    ChannelNormalizer,
     EnvRenderer,
     FieldTrace,
     FrameSource,
@@ -11,6 +12,7 @@ from die.view.render import (
 
 __all__ = [
     "AnimationRecorder",
+    "ChannelNormalizer",
     "EnvRenderer",
     "FieldTrace",
     "FrameSource",

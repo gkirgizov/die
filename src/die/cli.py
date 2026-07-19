@@ -20,10 +20,26 @@ FieldOpt = Annotated[int, typer.Option(min=8, help='Field side length (square fi
 RatioOpt = Annotated[float, typer.Option(min=0., max=1., help='Initial agent density.')]
 FpsOpt = Annotated[int, typer.Option(min=1, help='Animation frames per second.')]
 LogLevelOpt = Annotated[str, typer.Option(help='Python logging level.')]
+NormalizeOpt = Annotated[bool, typer.Option(
+    '--normalize/--no-normalize',
+    help='Rescale unbounded channels to the display range instead of letting '
+         'them saturate. Trades cross-channel color comparison for detail.')]
 
 
 def _setup_logging(level: str):
     logging.basicConfig(level=getattr(logging, level.upper(), logging.WARNING))
+
+
+def _frame_source(env, agent, normalize: bool, renders: bool):
+    """Builds the frame source, or None when nothing will consume frames.
+
+    Conditional so a headless run without recording never imports the view
+    layer (and with it matplotlib).
+    """
+    if not renders:
+        return None
+    from die.view.render import FrameSource
+    return FrameSource(env, agent, normalize=normalize)
 
 
 def _build_observers(headless: bool, record: Path | None, fps: int) -> list:
@@ -59,6 +75,7 @@ def run(agent: Annotated[AgentId, typer.Option(help='Agent behavior.')] = AgentI
         record: Annotated[Path | None,
                           typer.Option(help='Record the run to a .gif/.mp4 file.')] = None,
         fps: FpsOpt = 10,
+        normalize: NormalizeOpt = True,
         log_level: LogLevelOpt = 'WARNING'):
     """Run a scripted agent in the environment."""
     _setup_logging(log_level)
@@ -67,7 +84,10 @@ def run(agent: Annotated[AgentId, typer.Option(help='Agent behavior.')] = AgentI
     env = make_env(dynamics, field_size, agent_ratio=agent_ratio)
     agent_obj = make_agent(agent, field_size, seed=seed)
     sim = Simulation(env, agent_obj, seed=seed,
-                     observers=_build_observers(headless, record, fps))
+                     observers=_build_observers(headless, record, fps),
+                     frame_source=_frame_source(
+                         env, agent_obj, normalize,
+                         renders=not headless or record is not None))
     result = sim.run(steps)
     _report(result)
     if record:
@@ -83,6 +103,7 @@ def record(agent: Annotated[AgentId, typer.Option(help='Agent behavior.')] = Age
            agent_ratio: RatioOpt = 0.15,
            seed: SeedOpt = None,
            fps: FpsOpt = 10,
+           normalize: NormalizeOpt = True,
            out: Annotated[Path, typer.Option(
                help='Output file (.gif/.mp4) or directory.')] = Path('samples')):
     """Record an animation of a run, headless (no display needed)."""
@@ -97,7 +118,9 @@ def record(agent: Annotated[AgentId, typer.Option(help='Agent behavior.')] = Age
 
     from die.sim import TqdmObserver
     sim = Simulation(env, agent_obj, seed=seed,
-                     observers=[TqdmObserver(), AnimationRecorder(out, fps=fps)])
+                     observers=[TqdmObserver(), AnimationRecorder(out, fps=fps)],
+                     frame_source=_frame_source(env, agent_obj, normalize,
+                                                renders=True))
     result = sim.run(steps)
     _report(result)
     typer.echo(f'Animation saved to: {out}')
@@ -195,6 +218,7 @@ def replay(model: Annotated[Path, typer.Argument(help='Trained agent checkpoint 
            record: Annotated[Path | None,
                              typer.Option(help='Record the run to a .gif/.mp4 file.')] = None,
            fps: FpsOpt = 10,
+           normalize: NormalizeOpt = True,
            log_level: LogLevelOpt = 'WARNING'):
     """Replay a trained (saved) agent in the environment."""
     _setup_logging(log_level)
@@ -203,7 +227,10 @@ def replay(model: Annotated[Path, typer.Argument(help='Trained agent checkpoint 
     env = make_env(dynamics, field_size, agent_ratio=agent_ratio)
     agent_obj = load_agent(model)
     sim = Simulation(env, agent_obj, seed=seed,
-                     observers=_build_observers(headless, record, fps))
+                     observers=_build_observers(headless, record, fps),
+                     frame_source=_frame_source(
+                         env, agent_obj, normalize,
+                         renders=not headless or record is not None))
     result = sim.run(steps)
     _report(result)
 

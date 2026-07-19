@@ -39,6 +39,49 @@ ImagesType = Sequence[np.ndarray]
 RendererCallable = Callable[[], ImagesType]
 
 
+class ChannelNormalizer:
+    """Rescales unbounded scalar fields to [0, 1] for display.
+
+    Keeps one scale per named channel, so channels that live on wildly
+    different scales stay individually readable -- chem1 climbs past 4 over a
+    run while env_food never leaves 0.5, and a single shared scale would sink
+    the latter into the black.
+
+    Two details make it usable on live simulation data:
+
+    - **Percentile, not max.** The fields are heavy-tailed: a handful of hot
+      pixels sit several times above the 99th percentile, and scaling by the
+      max would squash everything else back into the dark.
+    - **Smoothed over time.** The scale is an EMA, so a channel drifting
+      across a run stays visible without the whole pane pulsing frame to frame.
+
+    Note this trades away cross-channel comparison: after normalizing, equal
+    brightness in two channels no longer means equal concentration.
+    """
+
+    def __init__(self,
+                 percentile: float = 99.,
+                 decay: float = 0.9,
+                 min_scale: float = 0.05):
+        self._percentile = percentile
+        self._decay = decay
+        self._min_scale = min_scale
+        self._scales: dict[str, float] = {}
+
+    def __call__(self, field: np.ndarray, key: str) -> np.ndarray:
+        values = np.asarray(field, dtype=float)
+        level = float(np.percentile(values, self._percentile))
+        previous = self._scales.get(key)
+        # First sighting seeds the EMA outright, else the channel would spend
+        # its first frames scaled towards an arbitrary starting point.
+        scale = level if previous is None \
+            else self._decay * previous + (1. - self._decay) * level
+        self._scales[key] = scale
+        # Floor the divisor: a near-empty field (a run whose agents died out)
+        # has a tiny percentile, and dividing by it amplifies dust into noise.
+        return values / max(scale, self._min_scale)
+
+
 class RendererBase:
     """Base class for helpers of rendering entities"""
 
@@ -84,14 +127,30 @@ class RendererBase:
 
 
 class EnvRenderer(RendererBase):
+    #: Medium channels shown as R, G, B -- all unbounded concentrations.
+    medium_channels = ('agents', 'env_food', 'chem1')
+
     def __init__(self,
                  field_size: tuple[int, int],
                  is_trace_colored: bool = True,
-                 field_colors_id: str = 'rgb'):
+                 field_colors_id: str = 'rgb',
+                 normalize: bool = True):
         self._is_trace_colored = is_trace_colored
         self._rgb_mapper = self._set_colors(field_colors_id)
         self._agent_trace = FieldTrace(field_size)
+        self._normalizer = ChannelNormalizer() if normalize else None
         super().__init__(field_size)
+
+    def _scaled(self, field, key: str) -> np.ndarray:
+        """Rescales an unbounded concentration channel, if normalizing.
+
+        Only for channels that are quantities. Masks (the alive/alpha channel)
+        and signed fields (an agent's gradient render) carry meaning that
+        per-channel rescaling would destroy, so they bypass this.
+        """
+        if self._normalizer is None:
+            return np.asarray(field, dtype=float)
+        return self._normalizer(field, key)
 
     def render(self, medium: MediumType, agents: AgtType) -> ImagesType:
         frames = [self._upd_img_medium(medium),
@@ -103,16 +162,17 @@ class EnvRenderer(RendererBase):
     def _upd_img_medium(self, medium: MediumType) -> np.ndarray:
         """Returns RGB/RGBA image ready for imshow"""
         # transpose dimensions so that channels dim would be the last
-        medium_data_rgb = np.stack([medium.sel(channel='agents'),
-                                    medium.sel(channel='env_food'),
-                                    medium.sel(channel='chem1'),
-                                    ], axis=-1)
+        medium_data_rgb = np.stack(
+            [self._scaled(medium.sel(channel=channel), channel)
+             for channel in self.medium_channels], axis=-1)
         medium_data_rgb = self._rgb_mapper(medium_data_rgb)
         return medium_data_rgb
 
     def _upd_img_trace(self, medium: MediumType) -> np.ndarray:
         self._agent_trace.update(medium.sel(channel='agents'))
-        trace_channel = self._agent_trace.as_mask()
+        # Scale before colormapping: the colormap maps [0, 1] and clips the
+        # rest, so an unbounded trace would arrive already flattened.
+        trace_channel = self._scaled(self._agent_trace.as_mask(), 'trace')
 
         cmap_id = 'magma' if self._is_trace_colored else 'gray'
         trace_colored = self._colorify(trace_channel, cmap_id)
@@ -130,8 +190,10 @@ class EnvRenderer(RendererBase):
             .values.reshape(shape).transpose((1, 2, 0))
         # Construct RGBA channels
         # Make dead cells appear as white space for contrast
+        # NB: the alive mask becomes the alpha channel -- it is a mask, not a
+        # quantity, so it must stay binary and is never rescaled.
         alive_mask = agents_data_rgb[:, :, 0].astype(bool)
-        agent_food = agents_data_rgb[:, :, 1]
+        agent_food = self._scaled(agents_data_rgb[:, :, 1], 'agent_food')
         zero_channel = np.zeros(img_shape)
         agents_data_rgb = np.stack([zero_channel,
                                     agent_food,
@@ -160,11 +222,13 @@ class FrameSource:
     trace -- so one instance should serve one simulation run at a time.
     """
 
-    def __init__(self, env: Env, agent: Agent, field_colors_id: str = 'rgb'):
+    def __init__(self, env: Env, agent: Agent, field_colors_id: str = 'rgb',
+                 normalize: bool = True):
         self._env = env
         self._agent = agent
         field_size = tuple(env.medium.shape[1:])
-        self._renderer = EnvRenderer(field_size, field_colors_id=field_colors_id)
+        self._renderer = EnvRenderer(field_size, field_colors_id=field_colors_id,
+                                     normalize=normalize)
 
     def frames(self) -> list[np.ndarray]:
         env_frames = self._renderer.render(self._env.medium, self._env.agents)
