@@ -141,6 +141,18 @@ class EnvRenderer(RendererBase):
         return agents_data_rgb
 
 
+def to_display_range(frame: np.ndarray) -> np.ndarray:
+    """Clips a float image to the [0, 1] range image consumers expect.
+
+    Rendered channels are unbounded (medium concentrations and agent food
+    grow past 1), while ``imshow`` accepts only [0, 1] floats -- it clips
+    anything else itself and logs a warning per frame, which floods the
+    terminal and breaks the progress bar. Clipping here keeps the live view
+    and the recorded animation (which clips in :func:`to_uint8_rgb`) identical.
+    """
+    return np.clip(frame, 0., 1.)
+
+
 class FrameSource:
     """Produces the visual frames for an (env, agent) pair.
 
@@ -157,7 +169,8 @@ class FrameSource:
     def frames(self) -> list[np.ndarray]:
         env_frames = self._renderer.render(self._env.medium, self._env.agents)
         agent_frames = self._agent.render()
-        return [frame for frame in [*env_frames, *agent_frames] if frame is not None]
+        return [to_display_range(frame)
+                for frame in [*env_frames, *agent_frames] if frame is not None]
 
     __call__ = frames
 
