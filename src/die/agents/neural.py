@@ -17,6 +17,9 @@ from die.utils import AgentIndexer, save_args
 
 
 class TorchAgent(Agent, nn.Module):
+    #: Extension used for checkpoints of this agent family (cf. JaxNCAAgent).
+    checkpoint_suffix = '.pt'
+
     @property
     @abstractmethod
     def model(self) -> nn.Module:

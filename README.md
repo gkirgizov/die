@@ -47,6 +47,15 @@ result = Simulation(env, agent, seed=42,
 
 `die train` evolves a **Neural Cellular Automata** agent with evolution strategies — no gradients, just variation and selection: kernels that feed their agents get to stay. Fitting, for a project called DIE.
 
+Search runs on **JAX + evosax** (PGPE with ClipUp) by default: the environment has a second, pure-functional implementation in `die/jx/`, so an entire population is evaluated in one jitted, vectorized call — ~30x faster per generation than the torch path on CPU. The original **evotorch** backend is still there behind the same `SearcherBackend` seam:
+
+```bash
+die train --backend evosax     # JAX (default), checkpoints to .msgpack
+die train --backend evotorch   # torch reference path, checkpoints to .pt
+```
+
+Either way, `die replay <checkpoint>` brings the trained agent back into the interactive environment.
+
 Every run is tracked with **MLflow**: full config, per-generation fitness, model checkpoints, and rollout animations of the current best agent.
 
 ```bash
@@ -59,7 +68,7 @@ mlflow ui --backend-store-uri sqlite:///runs/latest/mlflow.db
 - **Natural rewards** for effective feeding and staying alive.
 - **Gym environment** in the format of multi-channel 2D data arrays. Agents can sense (read) certain channels and can act (write to) other channels.
 - **Agent implementations** for Physarum, Gradient, Constant, and Brownian motion behaviors.
-- **Learning agents**: evolutionary Neural Cellular Automata.
+- **Learning agents**: evolutionary Neural Cellular Automata, evolved on a vectorized JAX core.
 - **Controlled dynamics** of the environment.
 - **Dynamic visualisation** of environments (see GIFs above), recorded with `die record`.
 - **Reproducible experiments**: seeded runs, agent serialization, MLflow tracking.

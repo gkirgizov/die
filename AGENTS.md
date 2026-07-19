@@ -34,11 +34,18 @@ logic.
 - **`view/`** is the only layer that turns world arrays into pixels.
   Recording is imageio-only and must work headless; matplotlib appears only
   in the interactive path.
+- **`jx/`**: a second, pure-JAX implementation of the env physics (fixed
+  shapes, alive-masks, no mutation) plus a Flax NCA and a `vmap`/`scan`
+  rollout. It exists to evaluate a whole population in one jitted call
+  (~30x/generation). It *coexists* with the xarray env rather than
+  replacing it — parity is pinned by tests, with one deliberate divergence
+  (collided deposits accumulate here, last-write-wins there).
 - **`train/`**: `EvolutionTrainer` evaluates candidates through the same
-  `Simulation`, behind a generation-granular `SearcherBackend` seam. The
-  concrete ES library (evotorch, pinned, semi-dormant upstream) is
-  deliberately confined to one module so it can be swapped (JAX/evosax is
-  the intended successor — see the roadmap).
+  `Simulation`, behind a generation-granular `SearcherBackend` seam. Two
+  backends live behind it, each confined to its own module: `evosax` (JAX,
+  the default, evaluates whole populations via `JaxEvolutionTrainer` and
+  `BatchedSearcherBackend`) and `evotorch` (torch, pinned, semi-dormant
+  upstream, kept as the reference implementation).
 - **`registry.py`** is the single source of agent/dynamics ids and tuned
   defaults. CLI, examples and tests all construct through it — new agents or
   dynamics presets get registered there, not duplicated.
@@ -66,6 +73,11 @@ logic.
   per-candidate training evaluation affordable. Don't bypass it in hot paths.
 - **Rendered channels are unbounded** (concentrations grow past 1); clip to
   display range before showing or encoding frames.
+- **Two engines, one physics**: any change to `env.py` must be mirrored in
+  `jx/env.py` (and vice versa) or the parity tests fail. `EnvConfig` is
+  static/hashable because it is baked into jit; `Dynamics` holds callables
+  and cannot be. Init stays host-side numpy so both engines share the
+  `DataInitializer` pipeline and agree seed-for-seed.
 
 ## Workflow
 

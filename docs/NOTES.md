@@ -348,3 +348,33 @@ pinned) behind a generation-granular `SearcherBackend` seam. The intended follow
   QDax for MAP-Elites experiments once QD beckons.
 - Vetoed: EvoJAX (archived), nevergrad (dormant), EvoX (active but device-batch-only eval,
   no PGPE — wrong shape for this project).
+
+### Status: done (`die/jx/` + `EvosaxBackend`)
+
+The port landed as a *coexisting* core, not a replacement: `die/jx/` holds the pure-JAX
+env, a Flax NCA and a `vmap`/`scan` rollout, and drives training via `EvosaxBackend`
+(PGPE + ClipUp) behind the unchanged `SearcherBackend` seam. The xarray env remains the
+reference implementation and the substrate for scripted agents, the live view and replay.
+
+Measured: **30.7x** steady-state speedup per generation (CPU, 64x64 field, popsize 16,
+50 episode steps) — 4.73 s/gen evotorch vs 0.15 s/gen evosax. Reproduce with
+`uv run python benchmarks/bench_generation.py`. Within the predicted 10-50x band; CUDA
+at larger popsize is untested.
+
+Deviations from the plan above, each forced by a verified fact:
+
+- **dm-pix is not used.** `dm_pix.gaussian_blur` only supports SAME/VALID padding, but the
+  medium diffuses with periodic ('wrap') boundaries. The blur is hand-rolled instead
+  (separable, `jnp.pad(mode='wrap')`), replicating scipy's kernel radius rule exactly —
+  it matches `skimage.filters.gaussian` to float32 epsilon.
+- **evosax minimizes**; reward is maximized, so fitness is negated across the boundary.
+- **Collided deposits accumulate** in the JAX core (scatter-add), where the xarray env's
+  numpy `+=` keeps only the last write. This is the intended fix (cf. the feeding-collision
+  bug logged above), but it makes the two engines diverge exactly when agents share a cell:
+  ~0.3% on a 20-step neural rollout. Everything else matches to ~1e-7, pinned by
+  `tests/unit/test_jx_env.py::TestRolloutParity`.
+- Episodes do not terminate early on extinction (a dead population just earns zero), which
+  keeps the scan shape static; the sense mask (`apply_sense_mask`, off by default) is not ported.
+
+Consequence worth remembering: a JAX-trained agent *replays* in the xarray env, so training
+and replay physics differ slightly at collision cells.

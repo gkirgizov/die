@@ -6,10 +6,11 @@ by the CLI, examples and tests.
 
 from enum import StrEnum
 from os import PathLike
+from pathlib import Path
 
 from die.agents.base import Agent
 from die.agents.gradient import GradientAgent, PhysarumAgent
-from die.agents.neural import NeuralAutomataAgent, TorchAgent
+from die.agents.neural import NeuralAutomataAgent
 from die.agents.static import BrownianAgent, ConstAgent
 from die.data_init import WaveSequence
 from die.env import Dynamics, Env
@@ -117,6 +118,31 @@ def make_env(dynamics_id: DynamicsId | str,
     return Env(field_size, dynamics)
 
 
-def load_agent(path: str | PathLike) -> TorchAgent:
-    """Loads a trained (torch-serialized) agent from a checkpoint file."""
-    return NeuralAutomataAgent.load(path)
+def load_agent(path: str | PathLike) -> Agent:
+    """Loads a trained agent from a checkpoint, dispatching on its format.
+
+    Two trainers write checkpoints: the torch/evotorch path (``.pt``) and the
+    JAX/evosax path (``.msgpack``). Suffix decides, with a content sniff as a
+    fallback for renamed files -- torch checkpoints are zip archives.
+    """
+    path = Path(path)
+    suffix = path.suffix.lower()
+    if suffix == '.msgpack':
+        return _load_jax_agent(path)
+    if suffix in ('.pt', '.pth'):
+        return NeuralAutomataAgent.load(path)
+
+    with open(path, 'rb') as handle:
+        magic = handle.read(4)
+    if magic[:2] == b'PK':
+        return NeuralAutomataAgent.load(path)
+    return _load_jax_agent(path)
+
+
+def _load_jax_agent(path: Path) -> Agent:
+    try:
+        from die.jx.agent import JaxNCAAgent
+    except ImportError as exc:
+        raise ImportError(
+            f'Loading {path.name} needs the JAX stack: uv sync --extra train') from exc
+    return JaxNCAAgent.load(path)

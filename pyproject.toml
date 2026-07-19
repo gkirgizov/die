@@ -21,8 +21,16 @@ dependencies = [
 
 [project.optional-dependencies]
 train = [
-    "evotorch==0.6.1",
+    # JAX stack -- the default training path (see docs/NOTES.md roadmap)
+    "jax>=0.5",
+    "flax>=0.10",
+    "optax>=0.2",
+    "evosax>=0.2,<0.3",
     "mlflow>=3.1",
+]
+# Legacy torch search path, kept as an alternate SearcherBackend.
+train-evotorch = [
+    "evotorch==0.6.1",
 ]
 video = [
     "imageio-ffmpeg>=0.5",
