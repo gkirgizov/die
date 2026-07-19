@@ -2,6 +2,8 @@
 
 **DIE** is an Artificial Life project aimed at reproducing emergence of distributed intelligence under environmental pressures using learning cellular automata models.
 
+The name is also the objective function: whatever fails to cooperate — dies.
+
 ----
 
 It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium) environment** with essential pressures for foraging, feeding, *not-dying*, together with **distributed agents** for solving it. Agents are a kind of learning cellular automata, hence they're *cooperative* (share the policy), observation and action spaces are *continuous*, and computations are *vectorized* for efficiency.
@@ -16,64 +18,39 @@ Left pane shows environment with food (green), agents (red) and their pheromone 
 
 This is a Physarum (slime mold) agent that communicates found food by releasing the pheromone and moves towards zones with more pheromone. Thanks to this information sharing between particles Physarum agent is much more efficient than Brownian agent in finding and consuming food.
 
-## Installation
-
-Requires Python ≥ 3.12. Using [uv](https://docs.astral.sh/uv/):
-
-```bash
-uv sync --all-extras        # everything, incl. the training stack
-uv sync                     # core only (no evotorch/mlflow)
-```
-
 ## Quick Start
 
-The `die` CLI is the main entry point:
+Requires Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/):
 
 ```bash
-die run --agent physarum                    # live view of a Physarum agent
-die run --agent brownian --headless --seed 42
-die record --agent physarum --out samples/  # save a GIF, no display needed
-die train --generations 100                 # evolve a Neural CA agent
-die replay runs/latest/checkpoints/best.pt  # watch a trained agent
-die --help                                  # all commands & options
+uv sync --all-extras
+
+die run --agent physarum                    # watch a slime mold emerge, live
+die record --agent brownian --out samples/  # save a GIF, no display needed
+die train --generations 100                 # evolve a Neural CA agent from scratch
+die replay runs/latest/checkpoints/best.pt  # watch what evolution came up with
 ```
 
-The same, minimal, from Python (see `examples/minimal_run.py`):
+The same from Python — the whole loop is three objects (see `examples/minimal_run.py`):
 
 ```python
-from die import AgentId, DynamicsId, Simulation, TqdmObserver, make_agent, make_env
+from die import AgentId, DynamicsId, Simulation, make_agent, make_env
 from die.view import InteractiveViewObserver
 
-env = make_env(DynamicsId.st_perlin, field_size=256, agent_ratio=0.1)
+env = make_env(DynamicsId.st_perlin, field_size=256)
 agent = make_agent(AgentId.physarum, field_size=256)
-sim = Simulation(env, agent, seed=42,
-                 observers=[TqdmObserver(), InteractiveViewObserver()])
-result = sim.run(300)
-print(result.total_reward)
+result = Simulation(env, agent, seed=42,
+                    observers=[InteractiveViewObserver()]).run(300)
 ```
 
-The `Simulation` runner owns the agent–env loop; presentation is pluggable
-via observers (`InteractiveViewObserver` for a live matplotlib view,
-`AnimationRecorder` for headless GIF/MP4 recording, `MetricsObserver` for
-in-memory stats).
+## Learning
 
-## Training & Observability
+`die train` evolves a **Neural Cellular Automata** agent with evolution strategies — no gradients, just variation and selection: kernels that feed their agents get to stay. Fitting, for a project called DIE.
 
-`die train` evolves a **Neural Cellular Automata** agent with evolution
-strategies ([evotorch](https://evotorch.ai) PGPE/CMA-ES behind a swappable
-`SearcherBackend` seam):
+Every run is tracked with **MLflow**: full config, per-generation fitness, model checkpoints, and rollout animations of the current best agent.
 
 ```bash
-die train --dynamics st-perlin-wide --generations 100 --popsize 10 \
-          --field-size 96 --seed 1 --out runs/exp1
-```
-
-Every run is tracked with **MLflow** (local SQLite backend by default):
-full config as params, per-generation fitness metrics, periodic model
-checkpoints and rollout animations of the current best agent as artifacts.
-
-```bash
-mlflow ui --backend-store-uri sqlite:///runs/exp1/mlflow.db
+mlflow ui --backend-store-uri sqlite:///runs/latest/mlflow.db
 ```
 
 ## Features
@@ -82,7 +59,7 @@ mlflow ui --backend-store-uri sqlite:///runs/exp1/mlflow.db
 - **Natural rewards** for effective feeding and staying alive.
 - **Gym environment** in the format of multi-channel 2D data arrays. Agents can sense (read) certain channels and can act (write to) other channels.
 - **Agent implementations** for Physarum, Gradient, Constant, and Brownian motion behaviors.
-- **Learning agents**: evolutionary Neural Cellular Automata (`die train`).
+- **Learning agents**: evolutionary Neural Cellular Automata.
 - **Controlled dynamics** of the environment.
 - **Dynamic visualisation** of environments (see GIFs above), recorded with `die record`.
 - **Reproducible experiments**: seeded runs, agent serialization, MLflow tracking.
@@ -93,17 +70,12 @@ The environmental pressure is designed in such a way so that agents must learn t
 
 ```bash
 uv sync --all-extras --dev
-uv run pytest                # fast suite: unit + behavioral invariants
-uv run pytest -m slow        # learning smoke tests (full training pipeline)
+uv run pytest                # fast: unit + behavioral invariants
+uv run pytest -m slow        # the full training pipeline
 uv run ruff check .
 ```
 
-Tests include high-level behavioral assertions — e.g. Physarum must
-out-forage Brownian motion by a calibrated margin, fitness must improve
-over a short evolution run — see `tests/behavior/`.
-
-Research notes and the modernization roadmap (JAX port, evosax) live in
-[docs/NOTES.md](docs/NOTES.md).
+Behavioral claims are tested, not just told: Physarum must out-forage Brownian motion by a calibrated margin, and a short evolution run must actually improve fitness (`tests/behavior/`). The architecture map lives in [AGENTS.md](AGENTS.md); research notes and the roadmap in [docs/NOTES.md](docs/NOTES.md).
 
 ## Background
 
