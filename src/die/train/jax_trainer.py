@@ -28,6 +28,19 @@ if TYPE_CHECKING:
     from die.train.loggers import TrainLogger
 
 
+def jax_device_summary() -> str:
+    """Short description of the backend JAX will run on, e.g. 'cuda:1xNVIDIA A100'.
+
+    Worth surfacing: with no GPU plugin installed jax quietly uses the CPU, so
+    a run that was meant to be accelerated looks identical apart from being slow.
+    """
+    import jax
+
+    devices = jax.devices()
+    kinds = {device.device_kind for device in devices}
+    return f'{devices[0].platform}:{len(devices)}x{"/".join(sorted(kinds))}'
+
+
 class JaxEvolutionTrainer(EvolutionTrainer):
     """Trains a :class:`~die.jx.agent.JaxNCAAgent` with a batched backend."""
 
@@ -51,6 +64,9 @@ class JaxEvolutionTrainer(EvolutionTrainer):
         described = super().describe()
         described.update({f'jx.{key}': str(value)
                           for key, value in vars(self.jx_config).items()})
+        # Recorded so a tracked run says whether it actually ran on a GPU --
+        # jax falls back to CPU silently when no device plugin is present.
+        described['jx.device'] = jax_device_summary()
         return described
 
     def _setup_backend(self) -> None:

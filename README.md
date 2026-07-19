@@ -78,11 +78,16 @@ The environmental pressure is designed in such a way so that agents must learn t
 ## Development
 
 ```bash
-uv sync --all-extras --dev
+uv sync --extra train --extra train-evotorch --extra video --dev
 uv run pytest                # fast: unit + behavioral invariants
 uv run pytest -m slow        # the full training pipeline
 uv run ruff check .
 ```
+
+On an NVIDIA machine, add `--extra train-cuda` for GPU-accelerated training
+(linux x86_64; use `jax[cuda13]` if your driver is CUDA 13). `die train` prints
+the JAX device it resolved, so it is obvious when a run silently fell back to CPU.
+Apple GPUs are not supported — [docs/NOTES.md](docs/NOTES.md) records why.
 
 Behavioral claims are tested, not just told: Physarum must out-forage Brownian motion by a calibrated margin, and a short evolution run must actually improve fitness (`tests/behavior/`). The architecture map lives in [AGENTS.md](AGENTS.md); research notes and the roadmap in [docs/NOTES.md](docs/NOTES.md).
 

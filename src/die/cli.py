@@ -201,8 +201,9 @@ def train(dynamics: Annotated[DynamicsId, typer.Option(help='Environment dynamic
             from die.jx.agent import JaxNCAAgent
             from die.jx.factory import make_jx_config
             from die.train.evosax_backend import EvosaxBackend
-            from die.train.jax_trainer import JaxEvolutionTrainer
+            from die.train.jax_trainer import JaxEvolutionTrainer, jax_device_summary
 
+            typer.echo(f'JAX device: {jax_device_summary()}')
             field = (field_size, field_size)
             agent_obj = JaxNCAAgent.create(field, seed=seed, kernel_sizes=(3, 3),
                                            scale=0.01, deposit=2.0)

@@ -81,7 +81,10 @@ logic.
 
 ## Workflow
 
-- uv only: `uv sync --all-extras --dev`. Lint: `uv run ruff check .`.
+- uv only: `uv sync --extra train --extra train-evotorch --extra video --dev`.
+  Avoid `--all-extras` on linux — it pulls the ~6 GB CUDA wheel set from the
+  `train-cuda` extra (a no-op on macOS, where the marker excludes it).
+  Lint: `uv run ruff check .`.
 - `uv run pytest` is the fast suite (unit + behavioral invariants);
   `-m slow` runs the full training pipeline (evolution + MLflow artifacts).
 - **Tests encode the science**: behavioral claims (Physarum out-forages

@@ -32,6 +32,13 @@ train = [
 train-evotorch = [
     "evotorch==0.6.1",
 ]
+# NVIDIA GPU acceleration for the JAX training path. The CUDA wheels are
+# linux-x86_64 only, so the marker keeps `uv sync --all-extras` working on
+# macOS (where it resolves to nothing) -- see docs/NOTES.md on Apple GPUs.
+# Use jax[cuda13] instead if your driver is CUDA 13.
+train-cuda = [
+    "jax[cuda12]>=0.5; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
 video = [
     "imageio-ffmpeg>=0.5",
 ]

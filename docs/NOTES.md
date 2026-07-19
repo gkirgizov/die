@@ -406,5 +406,24 @@ work for this workload. Three independent blockers, in order of severity:
    population), so this is not something to code around.
 
 Conclusion: stay on CPU, where the port already gives ~30x and an M-series CPU is fast.
-Real GPU scaling means CUDA on Linux — untested, and worth revisiting only at popsize >= 100
-or field sizes well beyond 96^2, where device parallelism can actually pay for itself.
+Real GPU scaling means CUDA on Linux — see below.
+
+### NVIDIA GPU (CUDA): wired up, unmeasured
+
+`--extra train-cuda` installs `jax[cuda12]`, marked linux-x86_64 so it stays inert on
+macOS. torch 2.13 and jax-cuda12 0.11 resolve to one shared NVIDIA library set (cudnn
+9.24, cublas 12.9) — no conflict, but ~6 GB of wheels, which is why the CI extras are
+listed explicitly instead of `--all-extras`.
+
+**No GPU numbers yet: nothing here has run on one.** CI's `cuda-smoke` job proves the
+extra installs, coexists with torch's CUDA libraries, and that the training path still
+works when the plugin is present but finds no device (jax must fall back to CPU rather
+than crash) — everything except that kernels execute on a GPU, which a standard runner
+cannot test. The `cuda-gpu` job does the real thing (asserts a GPU backend, trains, and
+benchmarks) but needs a runner labelled `gpu` and is manual-dispatch only.
+
+Expectations to check when a GPU is available: the CPU path is already only ~0.15 s per
+generation at 64^2/popsize 16, so per-generation latency is dominated by kernel launches
+at that size — a GPU should win only once popsize or field size grows enough to fill it.
+`jx.device` is recorded in every tracked run, so a run that quietly fell back to CPU is
+identifiable after the fact.

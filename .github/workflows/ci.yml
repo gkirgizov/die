@@ -5,9 +5,17 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # cuda-smoke is heavy, so it runs weekly and on demand rather than per push
+  # (or per push when the commit message contains '[cuda]').
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
 
 env:
   MPLBACKEND: Agg
+  # NB: not `--all-extras` -- on linux that would also pull the ~6 GB CUDA
+  # wheel set from `train-cuda`, which the cuda-smoke job installs on its own.
+  EXTRAS: --extra train --extra train-evotorch --extra video
 
 jobs:
   test:
@@ -18,8 +26,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
+      - name: Check lockfile is current
+        run: uv lock --check
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync ${{ env.EXTRAS }} --dev
       - name: Lint
         run: uv run ruff check .
       - name: Unit tests
@@ -34,6 +44,81 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync ${{ env.EXTRAS }} --dev
       - name: Behavioral tests
         run: uv run pytest -m slow
+
+  # Smoke test for the CUDA extra. GitHub's standard runners have no GPU, so
+  # this verifies everything *except* that kernels run on one: that the extra
+  # resolves and installs, that the CUDA plugin coexists with torch's own
+  # NVIDIA libraries, and that the training path still works when the plugin
+  # is present but finds no device (jax must fall back to CPU, not crash).
+  # Gated on the files that could break it -- the install is several GB.
+  cuda-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      contains(github.event.head_commit.message, '[cuda]')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+      - name: Install with CUDA extra
+        run: uv sync --extra train --extra train-cuda --dev
+      - name: Report resolved CUDA stack
+        run: |
+          uv pip list | grep -Ei 'jax|nvidia-cudnn|nvidia-cublas' || true
+          df -h /
+      - name: JAX imports and reports a device
+        run: |
+          uv run python -c "
+          import jax
+          from die.train.jax_trainer import jax_device_summary
+          print('devices:', jax.devices())
+          print('summary:', jax_device_summary())
+          "
+      - name: JAX training path works with the plugin installed
+        run: >-
+          uv run pytest -q
+          tests/unit/test_jx_env.py
+          tests/unit/test_jx_model.py
+          tests/unit/test_jx_agent.py
+          tests/unit/test_evosax_backend.py
+
+  # Manual/scheduled: the same smoke test on an actual GPU. Needs a runner
+  # labelled `gpu` (self-hosted or a GitHub GPU runner) -- skipped otherwise.
+  cuda-gpu:
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 45
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install with CUDA extra
+        run: uv sync --extra train --extra train-cuda --dev
+      - name: Assert JAX sees the GPU
+        run: |
+          uv run python -c "
+          import jax, sys
+          from die.train.jax_trainer import jax_device_summary
+          print('summary:', jax_device_summary())
+          if jax.devices()[0].platform != 'gpu':
+              sys.exit(f'expected a GPU backend, got {jax.devices()}')
+          "
+      - name: Train end to end on the GPU
+        run: |
+          uv run die train --backend evosax --generations 3 --popsize 8 \
+            --field-size 64 --episode-steps 20 --seed 7 --no-mlflow \
+            --checkpoint-every 0 --record-every 0 --out runs/ci-gpu
+      - name: Benchmark a generation
+        run: uv run python benchmarks/bench_generation.py --field-size 128 --popsize 32
