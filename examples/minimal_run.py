@@ -1,42 +1,27 @@
-import logging
+"""Minimal quick-start: run an agent in the environment with a live view.
 
-import numpy as np
-from tqdm import trange
+This is the README example. For the full-featured entry point use the CLI:
+    die run --agent physarum
+"""
 
-from core.agent.static import BrownianAgent
-from core.agent.gradient import PhysarumAgent
-from core.agent.base import Agent
-from core.env import Env, Dynamics
-from core.plotting import InteractivePlotter
-from core.utils import setup_logging
+from die import AgentId, DynamicsId, Simulation, TqdmObserver, make_agent, make_env
+from die.view import InteractiveViewObserver
 
 
-def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=1000):
-    # Setup the environment
-    dynamics = Dynamics(init_agent_ratio=agent_ratio)
-    env = Env(field_size, dynamics)
-    plotter = InteractivePlotter.get(env, agent)
+def run_minimal(agent_id: AgentId = AgentId.physarum,
+                field_size: int = 256,
+                agent_ratio: float = 0.1,
+                steps: int = 300,
+                seed: int | None = None):
+    env = make_env(DynamicsId.st_perlin, field_size, agent_ratio=agent_ratio)
+    agent = make_agent(agent_id, field_size, seed=seed)
 
-    total_reward = 0
-    obs = env._get_current_obs
-    for i in (pbar := trange(iters)):
-        # Step: action & observation
-        action = agent.forward(obs)
-        obs, reward, _, _, stats = env.step(action)
-        total_reward += reward
-        # Visualisation & logging
-        pbar.set_postfix(total_reward=np.round(total_reward, 3))
-        plotter.draw()
+    sim = Simulation(env, agent, seed=seed,
+                     observers=[TqdmObserver(), InteractiveViewObserver()])
+    result = sim.run(steps)
+    print(f'Total reward: {result.total_reward:.3f}')
 
 
 if __name__ == '__main__':
-    setup_logging(logging.WARNING)
-
-    random_agent = BrownianAgent(move_scale=0.01)
-    run_minimal(random_agent, agent_ratio=0.05, iters=200)
-
-    physarum_agent = PhysarumAgent(max_agents=256*256,
-                                   scale=0.006,
-                                   turn_angle=30,
-                                   sense_offset=0.04)
-    run_minimal(physarum_agent, agent_ratio=0.15, iters=200)
+    run_minimal(AgentId.brownian, steps=300)
+    run_minimal(AgentId.physarum, steps=300)
