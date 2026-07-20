@@ -6,6 +6,97 @@ AGENTS.md (stable invariants): entries land here first, and graduate to
 AGENTS.md only once they harden into conventions. Newest first within each
 date. Claims carry the measurement that backs them.
 
+## 2026-07-20 — Second PPO implementation (branch `rl-rejax`)
+
+Everything below is on the 16×16 benchmark: `init_agent_ratio=0.2`,
+`food_infinite=False`, `agents_die=False`, 120 iterations × 8 envs × 32 steps,
+deterministic evaluation on held-out worlds, **do-nothing baseline 2.68**.
+
+### Finding: setting `max_steps` destroys learning (+5.9 → −36)
+
+The single largest effect measured on this branch, and it is not the learner —
+it is the episode boundary. `compute_gae` treats every `done` as a termination,
+so a time-limit truncation zeroes a bootstrap that should have been taken.
+
+| `max_steps` | held-out return |
+|---|---|
+| `None` | **5.91** |
+| 64 | **−36.17** |
+
+The textbook description of truncation bias is "mild". Here it inverts the
+result. This is what `jx/interface.py` returning `terminated` and `truncated`
+*separately* is for, and it is why the RL path leaves `max_steps` unset and lets
+the rollout boundary do the bootstrapping.
+
+**Consequence for any gymnax-shaped library:** gymnax returns one `done`. So
+rejax cannot be run on a truncating configuration here at all — the cross-check
+is pinned to `max_steps=None`, `agents_die=False`, where nothing terminates.
+
+### Finding: a fully-packed grid is degenerate, like infinite food was
+
+rejax's loss cannot mask dead slots, so the tempting fix is
+`init_agent_ratio=1.0` (every cell an agent, zero dead slots, deterministic
+count, renderer untouched). It does not work — for a reason worth recording:
+
+| config | do-nothing | best trained |
+|---|---|---|
+| ratio 0.2 | 2.68 | 5.91 |
+| ratio 1.0 | **16.90** | −5.63 |
+
+When agents occupy every cell there is nowhere to forage *to*. The spatial
+search problem — the thing this environment is about — is removed by
+construction, and stillness wins again. **Second instance of the same trap**
+after `food_infinite=True`; the do-nothing baseline caught both.
+
+So the cross-check runs on the sparse grid and rejax eats ~80% dead action
+dimensions rather than have the benchmark bent to suit it.
+
+### Finding: the convolutional prior, not the PPO implementation, is decisive
+
+Same rejax loss, same env, only the network differs:
+
+| network | untrained | trained |
+|---|---|---|
+| conv trunk (ours, substituted into rejax) | 3.4 | −20.5 ± 18.2 |
+| rejax stock MLP over the flattened field | −25.3 | −32.8 ± 0.8 |
+
+The MLP never approaches the baseline. Caveat kept explicit: the two also differ
+in output-layer initialization (ours uses a small-gain orthogonal final layer),
+and the MLP's untrained score of −25 shows that init alone already costs it —
+so this measures "conv trunk as configured", not convolution in isolation.
+
+### Finding: single-seed RL numbers on this benchmark are not trustworthy
+
+Re-measuring across 3 seeds instead of 1:
+
+| setup | untrained | trained (3 seeds) |
+|---|---|---|
+| vendored, `per_agent` | 2.88 | **3.76 ± 2.34** |
+| vendored, `joint` | 2.88 | −2.05 ± 6.08 |
+| rejax, conv (`joint` only) | 3.42 | −20.50 ± 18.17 |
+
+**Partial retraction.** The 5.46/5.91 figures in the earlier entry and in PR #6
+are seed-0 results; the seed-averaged effect is real but much smaller (+0.88
+over untrained, ±2.34) and `test_ppo_beats_doing_nothing` passes on a pinned
+seed rather than on a robust claim. Nothing about the *mechanism* changes —
+`per_agent` is still the only configuration that does not degrade — but the
+magnitude was overstated and any future comparison here needs seed averaging.
+
+**Cross-check verdict:** the two implementations agree on the thing that
+matters and it is not flattering to either. Restricted to the joint objective,
+neither reliably beats inaction. The axis worth spending R&D on is the
+factorization (per-agent credit), not the choice of PPO implementation — which
+is exactly what a cross-check is for: it moved the suspicion off our vendored
+loss and onto the objective.
+
+### Note: what adapting to a single-agent library actually costs
+
+Three deviations `jx/interface.py` documents as deliberate all get paid for in
+`rl/rejax_backend.py`: joint-only rewards, no alive-masking in the loss, and
+truncation collapsed into termination. Plus one operational surprise —
+`rejax.Algorithm.create` deep-copies its config, so the init bank is duplicated
+per configured run.
+
 ## 2026-07-20 — First RL results (branch `rl-ppo`)
 
 ### Finding: `food_infinite=True` makes foraging degenerate

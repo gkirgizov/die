@@ -50,6 +50,11 @@ logic.
   the meta-learning phase will build on, and it is why the config splits into
   static (shapes, counts) and traced (scalars) halves. `RLAgent` wears the
   standard `Agent` interface, so replay/view/recording work unchanged.
+  `rejax_backend.py` runs the same env through rejax's PPO as an independent
+  witness on the vendored loss — a cross-check, not an alternative: it speaks
+  only single-agent gymnax, so it is pinned to the `joint` factorization and to
+  a non-terminating configuration. Its dependency chain (distrax → a TFP
+  nightly) is quarantined in the `train-rejax` extra.
 - **`train/`**: `EvolutionTrainer` evaluates candidates through the same
   `Simulation`, behind a generation-granular `SearcherBackend` seam. Two
   backends live behind it, each confined to its own module: `evosax` (JAX,
@@ -104,8 +109,19 @@ logic.
   statistics. Unmasked, the obs normalizer tracks the death rate rather than
   the quantity being normalized.
 - **Validate the task before the learner.** A do-nothing baseline is one
-  rollout. Under `food_infinite=True` stillness out-earns foraging, so a
-  learner can "succeed" while learning nothing — see docs/JOURNAL.md.
+  rollout, and it has caught two degenerate configurations already: under
+  `food_infinite=True` stillness out-earns foraging, and under
+  `init_agent_ratio=1.0` agents fill every cell so there is nowhere to forage
+  *to*. In both a learner can "succeed" while learning nothing — docs/JOURNAL.md.
+- **Truncation is not termination, and here the difference is not subtle.**
+  `compute_gae` cuts the bootstrap on every `done`, so setting `EnvParams.
+  max_steps` turns a +5.9 policy into a −36 one. The RL path leaves it unset and
+  bootstraps at the rollout boundary; `TimeStep` keeps `terminated` and
+  `truncated` separate precisely so this stays visible.
+- **RL numbers on this benchmark need seed averaging.** Held-out return varies
+  by ±2.3 across seeds at an effect size of ~+0.9, so a single-seed result can
+  read as 2× the baseline or as no effect. Pinned-seed thresholds in
+  `tests/behavior/` are regression guards, not evidence.
 
 ## Workflow
 
