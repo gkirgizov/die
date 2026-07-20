@@ -56,6 +56,28 @@ die train --backend evotorch   # torch reference path, checkpoints to .pt
 
 Either way, `die replay <checkpoint>` brings the trained agent back into the interactive environment.
 
+### Reinforcement learning
+
+`die rl` trains a policy with **PPO** on the same JAX core. The difference is
+how much of the environment's signal is used: evolution scores a whole episode
+with one number, while RL consumes *every agent's per-step energy change* —
+roughly 10⁵ times more signal per unit of simulation. That is what makes a
+network of ~88k parameters trainable here, against the 162-parameter kernel
+evolution can search.
+
+```bash
+die rl --iterations 200                        # PPO on the vectorized core
+die rl --reward-share 0                        # selfish agents: does communication survive?
+die rl --food-noise 0.25 --comm-noise 0.05     # a world that doesn't sit still
+die replay runs/latest/checkpoints/final.msgpack
+```
+
+It is one policy instantiated across a population of locations, not a
+multi-agent system: a convolution *is* a shared policy over local receptive
+fields. `--reward-share` sets whether an agent is rewarded for its own foraging
+or the population's — the knob that decides whether depositing pheromone can
+ever pay off. Findings and calibrations live in [docs/JOURNAL.md](docs/JOURNAL.md).
+
 Every run is tracked with **MLflow**: full config, per-generation fitness, model checkpoints, and rollout animations of the current best agent.
 
 ```bash
