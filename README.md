@@ -100,6 +100,72 @@ Every run is tracked with **MLflow**: full config, per-generation fitness, model
 mlflow ui --backend-store-uri sqlite:///runs/latest/mlflow.db
 ```
 
+## Benchmarking agents
+
+Every agent — scripted, evolved, and RL-trained — is scored on one common
+footing: **total unshaped energy gain over a fixed horizon**, the quantity all
+three paths in this repo already agree on.
+
+```bash
+uv run python benchmarks/train_bench.py --out models    # trains what needs training
+uv run python benchmarks/bench_agents.py --out results  # scores everyone
+uv run python benchmarks/plot_bench.py --results results
+```
+
+Agents are compared across a **family of generated environments** — one axis
+varied at a time from a fixed baseline, each at six world seeds:
+
+| axis | what it varies | values |
+|---|---|---|
+| `food_scale` | abundance (same patches, more or less food) | 0.25 – 4.0 |
+| `food_octaves` | patchiness (broad basins vs fine speckle) | 2 – 32 |
+| `food_noise` | resource that will not hold still | 0.1 – 0.5 |
+| `comm_noise` | corruption of the chemical channel | 0.02 – 0.1 |
+| `init_agent_ratio` | crowding | 0.05 – 0.4 |
+| `food_flow` | non-stationary, drifting resource | wave |
+
+The family's seeds are disjoint from both the training and evaluation seeds, so
+every number is out-of-sample: the benchmark measures **generalization to unseen
+worlds**, not recall of a memorized one.
+
+Two things worth knowing before reading results:
+
+- **The bar is doing nothing, not random.** Agents pay to move, so `null` is a
+  genuinely strong baseline — it has already caught configurations where
+  stillness out-earns foraging and a learner looked successful having learned
+  nothing.
+- **Never read a single seed.** Held-out return on this benchmark varies by more
+  than the effects being measured; two conclusions have been retracted for this
+  (see [docs/JOURNAL.md](docs/JOURNAL.md)). Trained agents are therefore stored
+  and reported at three training seeds each, and every figure shows the spread.
+
+### Visualising performance
+
+`plot_bench.py` writes two figures into `results/`:
+
+- **`heatmap.png`** — agent × scenario, coloured by *advantage over doing
+  nothing on that same scenario*. Diverging, centred at zero: blue beats
+  inaction, red loses to it, gray ties. Reading raw return instead would hide
+  the sign — a return of +2 looks respectable and is actually a loss.
+- **`axis_curves.png`** — one panel per environment axis, showing how each agent
+  degrades along it, with a band for the spread across world seeds.
+
+Both read `results/benchmark.csv` (one tidy row per agent × scenario × seed), so
+figures can be reworked without re-running the sweep.
+
+For a *qualitative* look at any single policy, replay a checkpoint into the live
+view or a GIF — this runs the xarray engine, so it works for every agent type:
+
+```bash
+die replay models/jx_nca_seed0.msgpack --field-size 16 --agent-ratio 0.2 --steps 400
+die replay models/rl_ppo_seed1.msgpack --field-size 16 --agent-ratio 0.2 \
+    --record out/ppo.gif --headless
+```
+
+Pass `--agent-ratio 0.2` to match the benchmark's crowding; `die replay`
+otherwise defaults to 0.1 and a different dynamics preset, so a rollout left at
+the defaults is not the world the reported numbers came from.
+
 ## Features
 
 - **Artificial Life system** with environmental pressures and agents' needs.
