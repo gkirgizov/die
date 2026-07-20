@@ -109,11 +109,59 @@ def build_family() -> list[Scenario]:
         scenarios.append(Scenario(f'agent-ratio-{ratio}', 'init_agent_ratio', ratio,
                                   dict(init_agent_ratio=ratio)))
 
+    # --- renewable resource: food that grows back ----------------------------
+    # Rates bracket the *balanced* point, where renewal offsets consumption.
+    # Measured under physarum over 40 steps: the non-renewable baseline runs
+    # 16.15 -> 10.18 total food, and 0.02 lands within 1% of where it started.
+    # So 0.01 is a world still running down, 0.02 sustainable, 0.04 recovering.
+    for rate in (0.01, 0.02, 0.04):
+        scenarios.append(Scenario(f'regrow-{rate}', 'regrow_rate', rate,
+                                  dict(regrow_rate=rate, food_capacity=0.5)))
+
+    # --- reappearing resource: food returning where it was exhausted ---------
+    # The only axis on which a depleted cell can come back. Bracketed the same
+    # way: 0.005 is the balanced rate.
+    for rate in (0.002, 0.005, 0.01):
+        scenarios.append(Scenario(f'respawn-{rate}', 'respawn_rate', rate,
+                                  dict(stochastic_respawn=True, respawn_rate=rate,
+                                       respawn_amount=0.15)))
+
     # --- non-stationary resource: food that moves under the agents -----------
-    scenarios.append(Scenario('wave-flow', 'food_flow', 1.0,
-                              dict(food_flow='wave', wave_scale=0.5, wave_decay=0.5)))
+    # Swept rather than left at one point: this was previously a single
+    # scenario and produced by far the largest effects in the family, which is
+    # the worst possible thing to under-sample. wave_decay sets how fast
+    # standing resource is replaced by the incoming wave.
+    for decay in (0.25, 0.5, 0.75):
+        scenarios.append(Scenario(f'wave-decay-{decay}', 'wave_decay', decay,
+                                  dict(food_flow='wave', wave_scale=0.5,
+                                       wave_decay=decay)))
 
     return scenarios
+
+
+def dynamic_params(**overrides):
+    """The training config for the dynamic-world checkpoints: a *renewable* world.
+
+    Regrowth and respawn at their balanced rates, and deliberately **no wave**.
+
+    An earlier version combined all three, on the reasoning that a policy shown
+    only one mechanism would have a blind spot. Measured, that was wrong, and
+    wrong in an instructive way: the three are not comparable in reward scale.
+    A wave world pays a do-nothing baseline of ~70 while a renewable one pays
+    ~3.5, so a combined objective is ~95% wave, and the resulting checkpoints
+    were wave specialists -- better than anything else on wave scenarios
+    (+152 over baseline) and *worse than the static-trained agents* on the
+    renewable ones they were supposed to be good at (-4.0 against +2.1).
+
+    The two are different questions, so they get different worlds. This one is
+    "food depletes and comes back"; the wave is "food moves", and it stays a
+    test-time axis, where the static-trained agents can be asked whether they
+    generalize to it without anyone having trained on it.
+    """
+    from die.bench.canonical import canonical_params
+    base = dict(regrow_rate=0.02, food_capacity=0.5,
+                stochastic_respawn=True, respawn_rate=0.005, respawn_amount=0.15)
+    return canonical_params(**{**base, **overrides})
 
 
 def family_axes() -> list[str]:

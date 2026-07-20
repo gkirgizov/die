@@ -18,10 +18,13 @@ seed difference as an effect, and a band makes the seed spread impossible to
 overlook.
 
 Palette follows the validated categorical order (blue, green, magenta, yellow,
-aqua, orange); the six slots pass the lightness, chroma, CVD and normal-vision
-gates on a light surface. Three of them sit under 3:1 contrast, which obligates
-"relief" -- so every curve is also directly labelled and the underlying CSV is
-the table view.
+aqua, orange, violet, red). All eight slots pass the lightness, chroma, CVD and
+normal-vision gates on a light surface -- worst adjacent CVD dE 9.1, worst
+adjacent normal-vision dE 19.6 -- on the *adjacent* pairlist, which is the one
+that applies to lines and bars. Three slots sit under 3:1 contrast, which
+obligates "relief", so every curve is also directly labelled and the underlying
+CSV is the table view. Eight is the cap: a ninth series folds into "other" or
+gets its own facet rather than an invented hue.
 """
 
 from __future__ import annotations
@@ -38,7 +41,8 @@ from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm  # noqa: E40
 
 #: Validated categorical order. Assigned to agents in a fixed order and never
 #: cycled, so an agent keeps its colour no matter which subset is plotted.
-SERIES_COLORS = ('#2a78d6', '#008300', '#e87ba4', '#eda100', '#1baf7a', '#eb6834')
+SERIES_COLORS = ('#2a78d6', '#008300', '#e87ba4', '#eda100',
+                 '#1baf7a', '#eb6834', '#4a3aa7', '#e34948')
 
 #: Diverging ramp for "better/worse than doing nothing": two poles that read as
 #: opposite, with a neutral gray midpoint so "no difference" reads as nothing.
@@ -53,10 +57,14 @@ TEXT_PRIMARY, TEXT_SECONDARY, GRID = '#0b0b0b', '#52514e', '#dcdbd6'
 
 #: Display order and grouping. Learned checkpoints arrive as one file per
 #: training seed; they are folded into a single series here.
-AGENT_ORDER = ('null', 'brownian', 'gradient', 'physarum', 'rl_ppo', 'jx_nca')
+AGENT_ORDER = ('null', 'brownian', 'gradient', 'physarum',
+               'rl_ppo', 'jx_nca', 'rl_ppo_dynamic', 'jx_nca_dynamic')
 AGENT_LABELS = {
     'null': 'do nothing', 'brownian': 'brownian', 'gradient': 'gradient',
-    'physarum': 'physarum', 'rl_ppo': 'PPO (RL)', 'jx_nca': 'NCA (evolved)',
+    'physarum': 'physarum',
+    'rl_ppo': 'PPO (static-trained)', 'jx_nca': 'NCA (static-trained)',
+    'rl_ppo_dynamic': 'PPO (dynamic-trained)',
+    'jx_nca_dynamic': 'NCA (dynamic-trained)',
 }
 
 

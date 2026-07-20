@@ -122,7 +122,25 @@ varied at a time from a fixed baseline, each at six world seeds:
 | `food_noise` | resource that will not hold still | 0.1 – 0.5 |
 | `comm_noise` | corruption of the chemical channel | 0.02 – 0.1 |
 | `init_agent_ratio` | crowding | 0.05 – 0.4 |
-| `food_flow` | non-stationary, drifting resource | wave |
+| `regrow_rate` | resource that **grows back** | 0.01 – 0.04 |
+| `respawn_rate` | resource that **reappears where it was exhausted** | 0.002 – 0.01 |
+| `wave_decay` | resource that **moves** under the agents | 0.25 – 0.75 |
+
+The last three are the dynamic axes, and they are three mechanisms rather than
+one because each does something the others cannot. The wave *moves* resource
+without creating any. Logistic regrowth renews it in place but provably cannot
+revive a cell foraged to exactly zero, since the term is proportional to what is
+already there. Only stochastic respawn creates resource where there is none.
+
+Renewal rates are calibrated against measured consumption, not chosen: under
+physarum over 40 steps the non-renewable baseline runs 16.15 → 10.18 total food,
+and the middle rate on each axis lands within 1% of where it started. An
+uncalibrated rate would just make the world richer, which is the failure mode
+already recorded for food noise.
+
+Learned agents are trained twice — on the static world and on a **renewable**
+one (regrowth + respawn) — so the table separates "cannot handle a changing
+resource" from "was never shown one".
 
 The family's seeds are disjoint from both the training and evaluation seeds, so
 every number is out-of-sample: the benchmark measures **generalization to unseen
