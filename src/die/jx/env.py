@@ -77,7 +77,9 @@ def init_state(seed: int | None, config: EnvParams) -> EnvState:
 
     medium = DataInitializer(config.field_size, DataChannels.medium) \
         .with_const('env_food', 0.5) \
-        .with_food_perlin(threshold=1.0, octaves=8) \
+        .with_food_perlin(threshold=config.food_threshold,
+                          octaves=config.food_octaves,
+                          scale=config.food_scale) \
         .with_agents(ratio=config.init_agent_ratio) \
         .build(name='medium')
     agents = DataInitializer.agents_from_medium(medium, max_agents=config.max_agents)

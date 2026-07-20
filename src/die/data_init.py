@@ -222,9 +222,25 @@ class DataInitializer:
         # self._channels['agent_food'] = agents * self._get_random(0.1, 0.2)
         return self
 
-    def with_food_perlin(self, threshold: float = 0.25, octaves: int = 8):
-        self._channels['env_food'] = self._mask(self._get_perlin(octaves=octaves),
-                                                mask_above=threshold)
+    def with_food_perlin(self, threshold: float = 0.25, octaves: int = 8,
+                         scale: float = 1.0):
+        """Perlin-patterned food field.
+
+        The three knobs are deliberately orthogonal, so an environment family
+        can vary one at a time:
+
+        - ``scale`` multiplies the surviving field, and is the *abundance* axis.
+          It is the only one of the three that leaves the spatial pattern
+          untouched: the same patches, more or less food in them.
+        - ``octaves`` sets perlin's frequency, and is the *patchiness* axis --
+          few octaves give large smooth basins, many give fine speckle. Agents
+          that follow gradients care about this far more than about abundance.
+        - ``threshold`` masks cells whose raw noise exceeds it. Note this clips
+          from *above*, so lowering it removes the richest cells and punches
+          holes in the peaks rather than uniformly thinning the field.
+        """
+        self._channels['env_food'] = scale * self._mask(self._get_perlin(octaves=octaves),
+                                                        mask_above=threshold)
         return self
 
     def with_chem(self, threshold: float = 0.1):

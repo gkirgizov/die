@@ -64,6 +64,15 @@ class Dynamics:
 
     # Initialization options
     init_agent_ratio: float = 0.1
+    #: Abundance of the initial food field: a plain multiplier on the perlin
+    #: patches. The scarce-to-rich axis of an environment family.
+    food_scale: float = 1.0
+    #: Perlin frequency of the food field -- few octaves give large smooth
+    #: basins, many give fine speckle. The patchiness axis.
+    food_octaves: int = 8
+    #: Upper mask on the raw perlin field; see
+    #: :meth:`die.data_init.DataInitializer.with_food_perlin`.
+    food_threshold: float = 1.0
 
 
 class Env(gym.Env[ObsType, ActType]):
@@ -83,7 +92,9 @@ class Env(gym.Env[ObsType, ActType]):
     def _init_data(self, field_size: tuple[int, int]):
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_const('env_food', 0.5) \
-            .with_food_perlin(threshold=1.0, octaves=8) \
+            .with_food_perlin(threshold=self.dynamics.food_threshold,
+                              octaves=self.dynamics.food_octaves,
+                              scale=self.dynamics.food_scale) \
             .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
         self.buffer_medium = self.medium.copy(deep=True)

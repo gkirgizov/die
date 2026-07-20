@@ -98,6 +98,14 @@ class EnvParams(struct.PyTreeNode):
     food_infinite: bool = struct.field(pytree_node=False, default=False)
     agents_die: bool = struct.field(pytree_node=False, default=False)
     init_agent_ratio: float = struct.field(pytree_node=False, default=0.1)
+    #: Food-field initialization, twins of the same fields on
+    #: :class:`die.env.Dynamics`. Static despite being continuous scalars:
+    #: they are consumed only by the host-side :func:`die.jx.env.init_state`,
+    #: never inside traced code, so sweeping them means building a different
+    #: init bank rather than vmapping. Same reasoning as ``init_agent_ratio``.
+    food_scale: float = struct.field(pytree_node=False, default=1.0)
+    food_octaves: int = struct.field(pytree_node=False, default=8)
+    food_threshold: float = struct.field(pytree_node=False, default=1.0)
     #: Steps before an episode is truncated (``None`` never truncates). Unlike
     #: every other field this has no twin in :class:`die.env.Dynamics` -- the
     #: xarray engine leaves episode length to ``Simulation.run``. It lives here
