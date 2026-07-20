@@ -112,12 +112,36 @@ Two things follow, both awkward for the parent PR:
    notes predicted, and that coupling appears to eat the gain. Worth testing at
    larger `num_envs` before concluding anything stronger.
 2. **rejax leads our vendored PPO by ~1.5 on the shared objective**, with seed
-   spreads that overlap. Suggestive, not established. The most plausible
-   mechanism is architectural rather than algorithmic: our `ActorCritic` shares
-   one conv trunk between policy and value heads, while rejax builds separate
-   networks — and in `joint` mode the value target is a *sum* over ~50 agents,
-   so its squared error is orders of magnitude larger and can swamp the policy
-   gradient through the shared trunk.
+   spreads that overlap. Suggestive, not established, and **currently
+   unexplained** — see below.
+
+#### Tested and refuted: the value-loss-swamping hypothesis
+
+Our `ActorCritic` shares one conv trunk between policy and value heads while
+rejax builds two separate networks. In `joint` mode the value target is a *sum*
+over ~50 agents, so its squared error is orders of magnitude larger than in
+`per_agent` mode — the obvious guess is that it swamps the policy gradient
+through the shared trunk. Down-weighting it should then recover the gap
+(`joint`, lr=3e-3, 3 seeds):
+
+| `value_coef` | trained |
+|---|---|
+| 0.5 (default) | 4.56 ± 0.82 |
+| 0.05 | 4.78 ± 2.90 |
+| 0.005 | 0.21 ± 2.77 |
+
+**It does not.** A 10× reduction leaves the mean unchanged within noise while
+tripling the seed spread, and a 100× reduction collapses the run — the critic
+evidently needs its weight, since bad value estimates mean bad advantages. The
+gradient-magnitude version of the hypothesis is dead.
+
+What survives untested is the *parameter-sharing* version: rejax gives the
+critic its own full-capacity trunk and the actor's trunk is never perturbed by
+value gradients at all, which scaling a shared loss cannot emulate. Other live
+candidates, roughly in order of suspicion: our linear LR anneal to zero (rejax
+does not anneal), elementwise `optax.clip` vs our `clip_by_global_norm`,
+tanh-squashing vs clip-to-box, and masked vs unmasked advantage normalization.
+**Recorded as open** rather than guessed at again.
 
 **Cross-check verdict:** it did the job a cross-check exists to do, twice. It
 caught a mis-calibrated learning rate that had inverted a conclusion, and it
