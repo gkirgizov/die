@@ -77,6 +77,23 @@ def _style(ax) -> None:
     ax.set_axisbelow(True)
 
 
+def _declutter(positions: list[float], min_gap: float) -> list[float]:
+    """Nudges end-of-line labels apart while preserving their vertical order.
+
+    Six series on one panel routinely end within a few percent of each other,
+    and overlapping labels are worse than none -- they misattribute a curve.
+    Sorting and pushing upward keeps each label nearest its own line and never
+    swaps two, so identity survives the adjustment.
+    """
+    order = sorted(range(len(positions)), key=lambda i: positions[i])
+    adjusted = list(positions)
+    for rank, index in enumerate(order[1:], start=1):
+        previous = adjusted[order[rank - 1]]
+        if adjusted[index] - previous < min_gap:
+            adjusted[index] = previous + min_gap
+    return adjusted
+
+
 def _grouped(rows: list[dict]) -> dict[tuple[str, str], list[float]]:
     """``(agent_group, scenario) -> returns``, pooling seeds and checkpoints."""
     pooled: dict[tuple[str, str], list[float]] = defaultdict(list)
@@ -102,7 +119,15 @@ def plot_heatmap(rows: list[dict], out_path: Path) -> Path:
                       if (a, s) in pooled else np.nan
                       for s in scenarios] for a in agents])
 
-    limit = float(np.nanmax(np.abs(grid))) or 1.
+    # Scale on a robust quantile, not the maximum. One scenario (wave-flow)
+    # produces advantages an order of magnitude larger than the rest, and
+    # scaling to it flattens the other eighteen columns into indistinguishable
+    # gray. Outliers saturate instead; every cell carries its exact value as a
+    # label, so saturation costs no information.
+    finite = np.abs(grid[np.isfinite(grid)])
+    limit = float(np.quantile(finite, 0.93)) if finite.size else 1.
+    limit = limit or float(np.nanmax(finite)) or 1.
+    saturated = int((np.abs(grid) > limit).sum())
     figure, ax = plt.subplots(figsize=(1.0 + 0.52 * len(scenarios),
                                        1.2 + 0.42 * len(agents)))
     image = ax.imshow(grid, cmap=_DIVERGING, aspect='auto',
@@ -128,9 +153,11 @@ def plot_heatmap(rows: list[dict], out_path: Path) -> Path:
                     va='center', fontsize=6.5,
                     color='#ffffff' if strong else TEXT_PRIMARY)
 
-    bar = figure.colorbar(image, ax=ax, pad=0.015, fraction=0.025)
-    bar.set_label('return minus do-nothing, same scenario', fontsize=8,
-                  color=TEXT_SECONDARY)
+    bar = figure.colorbar(image, ax=ax, pad=0.015, fraction=0.025, extend='both')
+    label = 'return minus do-nothing, same scenario'
+    if saturated:
+        label += f'\n({saturated} cells beyond ±{limit:.0f}, see labels)'
+    bar.set_label(label, fontsize=8, color=TEXT_SECONDARY)
     bar.ax.tick_params(labelsize=7, colors=TEXT_SECONDARY, length=2)
     bar.outline.set_visible(False)
 
@@ -162,8 +189,11 @@ def plot_axis_curves(rows: list[dict], out_path: Path) -> Path:
         if row['axis'] == 'baseline':
             baseline_pool[agent_group(row['agent'])].append(row['return'])
 
+    # A response curve needs something to respond along. Single-valued axes
+    # (food_flow is on/off, not a magnitude) would plot as isolated dots on an
+    # invented x-range; they are categorical and the heatmap already shows them.
     axis_names = [a for a in dict.fromkeys(r['axis'] for r in rows)
-                  if a != 'baseline']
+                  if a != 'baseline' and len(axes_values[a]) > 1]
     agents = [a for a in AGENT_ORDER
               if any(key[0] == a for key in pooled_raw)]
     colors = {agent: SERIES_COLORS[i % len(SERIES_COLORS)]
@@ -179,6 +209,7 @@ def plot_axis_curves(rows: list[dict], out_path: Path) -> Path:
         ax = grid_axes[index // columns][index % columns]
         _style(ax)
         values = sorted(axes_values[axis_name])
+        ends: list[tuple[float, float, str]] = []
         for agent in agents:
             means, lows, highs, xs = [], [], [], []
             for value in values:
@@ -197,18 +228,27 @@ def plot_axis_curves(rows: list[dict], out_path: Path) -> Path:
                     marker='o', markersize=4.5,
                     markeredgecolor='#fcfcfb', markeredgewidth=0.8,
                     label=AGENT_LABELS.get(agent, agent))
-            # Direct label at the line's end -- identity is never colour alone.
-            ax.annotate(AGENT_LABELS.get(agent, agent), (xs[-1], means[-1]),
-                        xytext=(4, 0), textcoords='offset points', fontsize=6.5,
-                        color=colors[agent], va='center')
+            ends.append((xs[-1], means[-1], agent))
 
         if baseline_pool:
-            level = np.mean(baseline_pool.get('null', [0.]))
+            level = float(np.mean(baseline_pool.get('null', [0.])))
             ax.axhline(level, color=TEXT_SECONDARY, linewidth=1.0,
                        linestyle=(0, (4, 3)), alpha=0.8)
-            ax.annotate('do nothing (baseline env)', (values[0], level),
-                        xytext=(0, 4), textcoords='offset points',
-                        fontsize=6.5, color=TEXT_SECONDARY)
+
+        # Direct labels last, once the y-scale is settled, so the gap that
+        # separates them is computed against the axis actually drawn.
+        low, high = ax.get_ylim()
+        ax.set_ylim(low, high)
+        placed = _declutter([end[1] for end in ends], 0.052 * (high - low))
+        for (x_end, _, agent), y_text in zip(ends, placed):
+            ax.annotate(AGENT_LABELS.get(agent, agent), (x_end, y_text),
+                        xytext=(5, 0), textcoords='offset points', fontsize=6.5,
+                        color=colors[agent], va='center', annotation_clip=False)
+        if baseline_pool:
+            # Anchored to the left edge, away from the labels on the right.
+            ax.annotate('do nothing', (values[0], level), xytext=(0, 3),
+                        textcoords='offset points', fontsize=6.5,
+                        color=TEXT_SECONDARY, ha='left')
 
         ax.set_title(axis_name, fontsize=10, color=TEXT_PRIMARY, loc='left')
         ax.set_xlabel(axis_name, fontsize=8, color=TEXT_SECONDARY)
