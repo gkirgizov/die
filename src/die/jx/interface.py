@@ -35,7 +35,7 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 
-from die.jx.env import init_state, step_with_aux
+from die.jx.env import agent_cells, init_state, step_with_aux
 from die.jx.state import AGENT_ALIVE, AGENT_FOOD, EnvParams, EnvState
 
 
@@ -50,10 +50,15 @@ class Obs:
     :param agent: ``[2, max_agents]`` proprioception -- (agent_food, alive).
         The field alone does not tell an agent its own energy, which is exactly
         the quantity survival depends on.
+    :param cells: ``[2, max_agents]`` int32 grid indices, one per agent. Carried
+        so the observation is self-sufficient: a convolutional policy produces a
+        field and each agent has to gather from it at its own position, and
+        rederiving that outside would mean handing the policy raw state.
     """
 
     medium: jax.Array
     agent: jax.Array
+    cells: jax.Array
 
 
 @struct.dataclass
@@ -80,9 +85,10 @@ class TimeStep:
 
 def get_obs(state: EnvState, params: EnvParams) -> Obs:
     """Assembles the observation from world state. No normalization here."""
-    del params      # obs shape is fixed by the state itself
+    ix, iy = agent_cells(state.agents, params)
     return Obs(medium=state.medium,
-               agent=state.agents[jnp.array([AGENT_FOOD, AGENT_ALIVE])])
+               agent=state.agents[jnp.array([AGENT_FOOD, AGENT_ALIVE])],
+               cells=jnp.stack([ix, iy]))
 
 
 def make_init_bank(seeds, params: EnvParams) -> EnvState:

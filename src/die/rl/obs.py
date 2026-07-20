@@ -127,12 +127,13 @@ class ObsNormalizer:
     def apply(self, obs: Obs, clip: float = 10.) -> Obs:
         """Standardizes an observation.
 
-        The alive row passes through untouched: it is an indicator, not a
-        feature. Among living agents it is identically 1, so its within-mask
-        variance is exactly zero and normalizing it would divide by ``_EPS``
-        and emit clipped garbage.
+        Two things pass through untouched. The alive row is an indicator, not a
+        feature: among living agents it is identically 1, so its within-mask
+        variance is exactly zero and normalizing it would divide by ``_EPS`` and
+        emit clipped garbage. Cell indices are integer array positions, not
+        measurements -- normalizing them would make them useless for gathering.
         """
         agent = self.agent.normalize(obs.agent, _AGENT_AXIS, clip)
         agent = agent.at[..., OBS_AGENT_ALIVE, :].set(obs.agent[..., OBS_AGENT_ALIVE, :])
-        return Obs(medium=self.medium.normalize(obs.medium, _MEDIUM_AXIS, clip),
-                   agent=agent)
+        return obs.replace(medium=self.medium.normalize(obs.medium, _MEDIUM_AXIS, clip),
+                           agent=agent)

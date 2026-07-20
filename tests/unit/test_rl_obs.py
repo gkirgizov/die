@@ -10,12 +10,17 @@ import pytest
 jax = pytest.importorskip('jax')
 jnp = jax.numpy
 
-from die.jx.interface import Obs, make_init_bank, reset, step  # noqa: E402
+from die.jx.interface import make_init_bank, reset, step  # noqa: E402
 from die.jx.state import EnvParams  # noqa: E402
 from die.rl.obs import OBS_AGENT_ALIVE, OBS_AGENT_FOOD, ObsNormalizer, RunningStats  # noqa: E402
 
 FIELD = (16, 16)
 MAX_AGENTS = FIELD[0] * FIELD[1]
+
+
+def _repeat(obs, times: int):
+    """Stacks an observation `times` over, whatever fields Obs happens to have."""
+    return jax.tree.map(lambda leaf: jnp.stack([leaf] * times), obs)
 
 
 def make_params(**overrides) -> EnvParams:
@@ -130,8 +135,7 @@ class TestObsNormalizer:
 
     def test_handles_batched_observations(self):
         obs = rollout(num_steps=1)[0]
-        batched = Obs(medium=jnp.stack([obs.medium] * 4),
-                      agent=jnp.stack([obs.agent] * 4))
+        batched = _repeat(obs, 4)
 
         single = ObsNormalizer.create().update(obs)
         batch = ObsNormalizer.create().update(batched)
@@ -150,7 +154,6 @@ class TestObsNormalizer:
         updated = jax.jit(lambda n, o: n.update(o))(ObsNormalizer.create(), obs)
         assert np.all(np.isfinite(np.asarray(updated.medium.mean)))
 
-        stacked = Obs(medium=jnp.stack([obs.medium] * 3),
-                      agent=jnp.stack([obs.agent] * 3))
+        stacked = _repeat(obs, 3)
         out = jax.vmap(lambda o: updated.apply(o))(stacked)
         assert out.medium.shape == (3, 3, *FIELD)
