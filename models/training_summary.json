@@ -1,0 +1,41 @@
+{
+  "rl_ppo_seed0.msgpack": {
+    "kind": "ppo",
+    "seed": 0,
+    "heldout_return": 2.985286235809326,
+    "seconds": 38.1
+  },
+  "rl_ppo_seed1.msgpack": {
+    "kind": "ppo",
+    "seed": 1,
+    "heldout_return": 5.800992012023926,
+    "seconds": 39.3
+  },
+  "rl_ppo_seed2.msgpack": {
+    "kind": "ppo",
+    "seed": 2,
+    "heldout_return": 5.249643802642822,
+    "seconds": 39.8
+  },
+  "jx_nca_seed0.msgpack": {
+    "kind": "es",
+    "seed": 0,
+    "train_fitness": 8.79054069519043,
+    "heldout_return": 7.077769637107849,
+    "seconds": 2.7
+  },
+  "jx_nca_seed1.msgpack": {
+    "kind": "es",
+    "seed": 1,
+    "train_fitness": 9.123279571533203,
+    "heldout_return": 7.44193160533905,
+    "seconds": 2.1
+  },
+  "jx_nca_seed2.msgpack": {
+    "kind": "es",
+    "seed": 2,
+    "train_fitness": 9.511646270751953,
+    "heldout_return": 5.680012226104736,
+    "seconds": 2.1
+  }
+}
