@@ -183,6 +183,32 @@ def agent_cells(agents: jax.Array, config: EnvParams) -> tuple[jax.Array, jax.Ar
     return cells_at(agents[AGENT_X:AGENT_Y + 1], config)
 
 
+def regrow_food(food: jax.Array, config: EnvParams) -> jax.Array:
+    """Logistic regrowth -- the twin of :meth:`die.env.Env._regrow`.
+
+    ``food += rate * food * (1 - food / capacity)``: renewable resource,
+    fastest at half capacity and self-limiting there. Deterministic, and that
+    is why it belongs here rather than in the noise layer -- the physics core
+    stays RNG-free and bit-comparable across both engines, which is the
+    invariant that lets any of these results be cross-checked at all.
+
+    It provably cannot revive a cell at exactly zero, since the term is
+    proportional to what is already present. That is a property of logistic
+    growth rather than a gap, and it is precisely why reappearance is a
+    separate, stochastic mechanism (:func:`die.jx.interface.respawn_food`).
+
+    Computed unconditionally rather than skipped when the rate is zero.
+    ``regrow_rate`` is a *traced* leaf -- a continuous scalar that only ever
+    multiplies, exactly what :class:`~die.jx.state.EnvParams` says belongs on
+    that side so it can be swept under ``vmap`` -- and a Python ``if`` on a
+    tracer raises ``TracerBoolConversionError`` the moment params arrive as a
+    jit argument rather than a closed-over constant. At rate 0 the added term
+    is identically zero, so the guard bought a field of elementwise ops next to
+    a gaussian blur and cost jit-compatibility.
+    """
+    return food + config.regrow_rate * food * (1. - food / config.food_capacity)
+
+
 def step_with_aux(state: EnvState,
                   action: jax.Array,
                   config: EnvParams) -> tuple[EnvState, jax.Array, StepAux]:
@@ -243,10 +269,17 @@ def step_with_aux(state: EnvState,
         num_ts = len(np.arange(*config.wave_t_bounds, config.wave_dt))
         t = (state.step % num_ts) * config.wave_dt
         flow = _wave_field(t, config)
-        medium = medium.at[MEDIUM_FOOD].set(
-            config.wave_scale * flow + (1 - config.wave_decay) * medium[MEDIUM_FOOD])
+        # Clipped at zero, mirroring WaveSequence.get_flow_operator: the wave
+        # term is a signed cosine mixture, and negative *food* inverts every
+        # quantity downstream -- feeding drains the agent and the env's own
+        # deduction adds resource back. See that docstring for the measurement.
+        medium = medium.at[MEDIUM_FOOD].set(jnp.maximum(
+            config.wave_scale * flow + (1 - config.wave_decay) * medium[MEDIUM_FOOD],
+            0.))
     elif config.food_flow != 'none':
         raise ValueError(f'Unknown food flow: {config.food_flow}')
+
+    medium = medium.at[MEDIUM_FOOD].set(regrow_food(medium[MEDIUM_FOOD], config))
 
     diffused = gaussian_blur_wrap(medium[MEDIUM_CHEM],
                                   config.diffuse_sigma, config.blur_radius)

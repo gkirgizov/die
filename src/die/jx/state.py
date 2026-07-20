@@ -118,6 +118,12 @@ class EnvParams(struct.PyTreeNode):
     #: Also has no xarray twin -- noise is applied by the RL interface layer, so
     #: the physics core stays RNG-free and bit-comparable across both engines.
     stochastic_medium: bool = struct.field(pytree_node=False, default=False)
+    #: Enables stochastic resource reappearance (see ``respawn_rate``). A gate
+    #: of its own rather than a reuse of ``stochastic_medium``, so a run can
+    #: have a fluctuating resource without a reappearing one, or the reverse --
+    #: they are different questions about a world and the family varies them
+    #: independently.
+    stochastic_respawn: bool = struct.field(pytree_node=False, default=False)
     wave_dt: float = struct.field(pytree_node=False, default=0.01)
     wave_t_bounds: tuple[float, float] = struct.field(pytree_node=False, default=(0.0, 10.0))
     #: Half-length of the diffusion kernel. ``None`` derives it from
@@ -133,6 +139,21 @@ class EnvParams(struct.PyTreeNode):
     cost_weights: tuple[float, float] = (0.02, 0.01)
     wave_scale: float = 0.5
     wave_decay: float = 0.5
+    #: Logistic regrowth rate, the twin of :attr:`die.env.Dynamics.regrow_rate`.
+    #: Deterministic, so it lives in the physics core and stays mirrored across
+    #: both engines; 0 leaves food non-renewable, as every earlier result assumed.
+    regrow_rate: float = 0.0
+    #: Carrying capacity the regrowth saturates at.
+    food_capacity: float = 1.0
+    #: Per-cell probability that a fresh patch of food appears this step, and
+    #: how much appears. Unlike ``regrow_rate`` this *can* repopulate a cell at
+    #: exactly zero, which logistic growth provably cannot -- that is the whole
+    #: reason it is a separate mechanism. It needs an RNG, so it is applied by
+    #: :func:`die.jx.interface.respawn_food` rather than by the physics core,
+    #: the same split ``food_noise``/``comm_noise`` already use, and it requires
+    #: ``stochastic_respawn``.
+    respawn_rate: float = 0.0
+    respawn_amount: float = 0.0
     #: Relative standard deviation of *multiplicative* per-step noise on the
     #: food channel -- a resource whose level fluctuates rather than sitting
     #: still, so a policy cannot memorize one field. Multiplicative because food

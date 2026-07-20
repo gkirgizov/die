@@ -339,6 +339,15 @@ class TestParamsSplit:
                   if field.metadata.get('pytree_node', True)]
         assert traced == ['rate_feed', 'rate_decay_chem', 'diffuse_sigma',
                           'cost_weights', 'wave_scale', 'wave_decay',
+                          # Resource renewal. Traced, and the classification
+                          # was earned: regrow_rate is applied inside the
+                          # jitted step, so an earlier version that branched on
+                          # it in Python raised TracerBoolConversionError the
+                          # moment params arrived as a jit argument. The fix
+                          # was to drop the branch, not to make it static --
+                          # these have to sweep under vmap like the rest.
+                          'regrow_rate', 'food_capacity',
+                          'respawn_rate', 'respawn_amount',
                           'food_noise', 'comm_noise']
         # cost_weights is one field but two leaves
         assert len(jax.tree.leaves(config)) == len(traced) + 1

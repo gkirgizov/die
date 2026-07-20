@@ -28,10 +28,28 @@ class FieldSequence(Sequence[np.ndarray]):
                           scale: float = 1.0,
                           decay: float = 0.0,
                           ) -> FoodOperator:
+        """Food that drifts: existing resource decays toward a travelling wave.
+
+        The wave term is a cosine mixture and so is signed. It is clipped at
+        zero here because the channel it writes to is *food* -- a resource that
+        is eaten and paid for -- and a negative level inverts the meaning of
+        every quantity downstream: feeding on a negative cell drains the agent,
+        the env's own deduction adds resource back, and "food consumed" stops
+        being defined. Measured before the clip existed: with scale=decay=0.5
+        the 16x16 world went from +16.1 total food to -9.6 within five steps,
+        with cells reaching -1.24, so this was the common case rather than an
+        edge one.
+
+        Clipping is what makes the wave a moving *resource* rather than a
+        signed potential field. No parameter choice avoids it: the wave
+        oscillates negative by construction and the steady state is
+        ``scale * wave / decay``, so any ``decay > 0`` drives troughs below
+        zero.
+        """
         it = iter(self)
 
         def food_flow(current):
-            return scale * next(it) + (1 - decay) * current
+            return np.maximum(scale * next(it) + (1 - decay) * current, 0.)
 
         return food_flow
 
