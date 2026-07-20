@@ -95,8 +95,11 @@ class TestActorCritic:
         params = net.init(jax.random.key(0), obs)
         mean, log_std, value = net.apply(params, obs)
         assert mean.shape == (MAX_AGENTS, NUM_ACTIONS)
-        assert log_std.shape == (NUM_ACTIONS,)
         assert value.shape == (MAX_AGENTS,)
+        # broadcast to the agent axis so every output shares leading dimensions,
+        # which is what keeps vmap over worlds well-formed
+        assert log_std.shape == mean.shape
+        assert float(log_std.std(axis=0).max()) == 0.     # still state-independent
 
     def test_starts_near_its_mean(self):
         """Small final-layer gain -- the standard guard against a destructive

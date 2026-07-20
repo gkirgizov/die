@@ -110,7 +110,14 @@ class ActorCritic(nn.Module):
 
     @nn.compact
     def __call__(self, obs: Obs) -> tuple[jax.Array, jax.Array, jax.Array]:
-        """Returns ``(mean [A, 3], log_std [3], value [A])`` for one world."""
+        """Returns ``(mean, log_std, value)`` for one world.
+
+        ``mean`` and ``log_std`` are both ``[A, 3]`` and ``value`` is ``[A]``.
+        The spread is a single state-independent parameter, but it is broadcast
+        to the agent axis before returning so that every output carries the same
+        leading dimensions -- otherwise ``vmap`` over worlds gives it a world
+        axis and no agent axis, and it stops broadcasting against ``mean``.
+        """
         field = ConvTrunk(self.features, self.num_blocks, self.kernel_size)(obs.medium)
         gathered = field[obs.cells[0], obs.cells[1]]                    # [A, features]
         proprioception = obs.agent[OBS_AGENT_FOOD][:, None]             # [A, 1]
@@ -131,7 +138,7 @@ class ActorCritic(nn.Module):
             self.hidden, kernel_init=nn.initializers.orthogonal(jnp.sqrt(2.)))(x))
         value = nn.Dense(1, kernel_init=nn.initializers.orthogonal(1.))(critic)[..., 0]
 
-        return mean, log_std, value
+        return mean, jnp.broadcast_to(log_std, mean.shape), value
 
     @property
     def receptive_field(self) -> int:
