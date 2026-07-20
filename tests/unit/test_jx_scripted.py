@@ -156,6 +156,47 @@ def assert_per_channel_close(action_jx, action_xr, alive, rtol=1e-5, atol=1e-7):
                                    err_msg=f'channel {channel} diverged')
 
 
+class TestSignedZeroConvention:
+    """Pins a deliberate bug-compatibility choice, so it fails legibly.
+
+    :func:`die.utils.xy2polar` takes the angle of ``x + np.multiply(1j, y)``,
+    which is **not** ``arctan2(y, x)``: the complex multiply contributes
+    ``copysign(0, y)`` to the real part, so ``(-0.0, +0.0)`` collapses to
+    ``(+0.0, +0.0)`` and reports angle 0 where IEEE reports pi.
+
+    That is reachable rather than theoretical. ``grad_clip`` discards weak
+    gradients by multiplying by a boolean, which preserves the sign bits of the
+    direction it just threw away, and Physarum's ``undetermined_grad`` fires on
+    angle 0 but not on pi. Measured on the 16x16 world at seed 7: at step 1, 28
+    cells sit in ``0 < norm < grad_clip``, 22 carry a negative zero, and 13
+    disagree between the two conventions -- so a clipped gradient that happened
+    to point left is read as a decided heading while one pointing right is not.
+
+    :func:`die.jx.scripted._angle` reproduces the quirk on purpose: diverging
+    would make the JAX Physarum a *different agent* from the one the xarray
+    benchmark numbers describe. This test exists so that "cleaning up"
+    ``xy2polar`` to ``arctan2`` fails here, naming the coupling, rather than
+    surfacing as an unexplained multi-step parity drift.
+    """
+
+    @pytest.mark.parametrize('x,y', [(-0.0, 0.0), (-0.0, -0.0), (0.0, 0.0),
+                                     (-1.0, 0.0), (-1.0, -0.0), (1.0, 0.0)])
+    def test_matches_the_xarray_helper(self, x, y):
+        from die.jx.scripted import _angle
+        from die.utils import xy2polar as reference
+        np.testing.assert_allclose(float(_angle(jnp.float32(x), jnp.float32(y))),
+                                   reference(np.float64(x), np.float64(y))[1],
+                                   atol=1e-6)
+
+    def test_the_quirk_is_still_a_quirk(self):
+        """Guards the guard: if numpy ever made np.angle sign-neutral, the test
+        above would pass vacuously and the port would need revisiting."""
+        from die.utils import xy2polar as reference
+        assert not np.isclose(reference(np.float64(-0.0), np.float64(0.0))[1],
+                              np.arctan2(0.0, -0.0)), (
+            'np.angle is now sign-neutral; _angle no longer needs to emulate it')
+
+
 class TestNullPolicy:
     def test_action_is_exactly_zero(self):
         params = make_params()
