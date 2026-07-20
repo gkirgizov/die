@@ -32,6 +32,13 @@ train = [
 train-evotorch = [
     "evotorch==0.6.1",
 ]
+# Second, independent PPO implementation, used as a cross-check on the vendored
+# one (die/rl/rejax_backend.py). Deliberately *not* part of `train`: rejax pulls
+# distrax, which pulls a TensorFlow-Probability nightly. That is an acceptable
+# dependency for an experiment and not for the default install path.
+train-rejax = [
+    "rejax>=0.1.3",
+]
 # NVIDIA GPU acceleration for the JAX training path. The CUDA wheels are
 # linux-x86_64 only, so the marker keeps `uv sync --all-extras` working on
 # macOS (where it resolves to nothing) -- see docs/NOTES.md on Apple GPUs.
