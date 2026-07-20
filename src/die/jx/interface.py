@@ -36,7 +36,14 @@ import jax.numpy as jnp
 from flax import struct
 
 from die.jx.env import agent_cells, init_state, step_with_aux
-from die.jx.state import AGENT_ALIVE, AGENT_FOOD, EnvParams, EnvState
+from die.jx.state import (
+    AGENT_ALIVE,
+    AGENT_FOOD,
+    MEDIUM_CHEM,
+    MEDIUM_FOOD,
+    EnvParams,
+    EnvState,
+)
 
 
 @struct.dataclass
@@ -112,15 +119,65 @@ def reset(key: jax.Array, bank: EnvState, params: EnvParams) -> tuple[Obs, EnvSt
     return get_obs(state, params), state
 
 
-def step_env(state: EnvState,
+def perturb_medium(key: jax.Array, medium: jax.Array, params: EnvParams) -> jax.Array:
+    """Per-step noise on the food and chemical channels.
+
+    Applied here rather than in :mod:`die.jx.env` so the physics core stays
+    RNG-free and bit-comparable with the xarray engine -- AGENTS.md's "two
+    engines, one physics" invariant. The cost is that this perturbation has no
+    xarray twin, so a policy trained under noise *replays* in a clean world.
+
+    The two channels are perturbed **differently**, and the asymmetry is the
+    whole point:
+
+    *Food is multiplicative.* It has to be mean-preserving, because food is
+    reward. Additive noise clipped at zero is a rectifier: on an empty cell it
+    turns negative draws into 0 and positive draws into free resource, so at
+    sigma=0.05 an empty cell gains +0.02 food per step out of nothing. Measured,
+    after it inverted an entire robustness experiment -- policies scored *higher*
+    under "noise" because the noise was feeding them. Multiplicative noise
+    perturbs the level of resource that is already there and keeps empty cells
+    empty.
+
+    **``food_noise`` is only meaningful up to about 0.5.** The clip at zero
+    reintroduces the same upward bias once negative draws become common:
+    ``E[max(1 + s*Z, 0)] = Phi(1/s) + s*phi(1/s)``, which is +0.0% at s=0.25,
+    +0.4% at s=0.5, +1.2% at s=0.6 and +8.3% at s=1.0. Above ~0.6 the "harder"
+    world is measurably a richer one and results stop being interpretable.
+
+    *Chemical is additive.* Chem is not reward, it is signal, and a corrupted
+    communication channel must be able to produce **false positives** --
+    multiplicative noise could only ever attenuate a message that was already
+    there, never fabricate one. The resulting positive offset is a constant
+    haze that observation normalization absorbs, leaving the variance, which is
+    exactly the signal-to-noise knob intended: chem is the only route by which
+    information reaches a distant agent, so this degrades cooperation
+    specifically rather than perception in general.
+    """
+    if not params.stochastic_medium:
+        return medium
+
+    food_key, chem_key = jax.random.split(key)
+    shape = medium[MEDIUM_FOOD].shape
+    food = medium[MEDIUM_FOOD] * (1. + params.food_noise * jax.random.normal(food_key, shape))
+    chem = medium[MEDIUM_CHEM] + params.comm_noise * jax.random.normal(chem_key, shape)
+    return medium.at[MEDIUM_FOOD].set(jnp.maximum(food, 0.)) \
+                 .at[MEDIUM_CHEM].set(jnp.maximum(chem, 0.))
+
+
+def step_env(key: jax.Array,
+             state: EnvState,
              action: jax.Array,
              params: EnvParams) -> tuple[TimeStep, EnvState]:
     """One step of raw physics, without auto-reset.
 
     ``action`` is ``[3, max_agents]`` -- (dx, dy, deposit1), already scaled into
-    world units by the caller.
+    world units by the caller. ``key`` drives medium noise only, and is unused
+    when ``stochastic_medium`` is off.
     """
     next_state, _, aux = step_with_aux(state, action, params)
+    next_state = next_state.replace(
+        medium=perturb_medium(key, next_state.medium, params))
 
     extinct = next_state.agents[AGENT_ALIVE].sum() == 0
     if params.max_steps is None:
@@ -155,8 +212,9 @@ def step(key: jax.Array,
     population simply earns zero for the rest of the episode, a stalled world
     here would go on consuming rollout budget while producing no transitions.
     """
-    timestep, next_state = step_env(state, action, params)
-    fresh_obs, fresh_state = reset(key, bank, params)
+    noise_key, reset_key = jax.random.split(key)
+    timestep, next_state = step_env(noise_key, state, action, params)
+    fresh_obs, fresh_state = reset(reset_key, bank, params)
 
     reset_now = timestep.truncated
     next_state = jax.tree.map(

@@ -14,11 +14,17 @@ from die.jx.env import step_with_aux  # noqa: E402
 from die.jx.interface import (  # noqa: E402
     get_obs,
     make_init_bank,
+    perturb_medium,
     reset,
     step,
     step_env,
 )
-from die.jx.state import AGENT_ALIVE, EnvParams  # noqa: E402
+from die.jx.state import (  # noqa: E402
+    AGENT_ALIVE,
+    MEDIUM_CHEM,
+    MEDIUM_FOOD,
+    EnvParams,
+)
 
 FIELD = (16, 16)
 MAX_AGENTS = FIELD[0] * FIELD[1]
@@ -82,7 +88,7 @@ class TestStepEnv:
         _, state = reset(jax.random.key(0), bank, params)
         action = deposit_action()
 
-        timestep, _ = step_env(state, action, params)
+        timestep, _ = step_env(jax.random.key(0), state, action, params)
         _, _, aux = step_with_aux(state, action, params)
         np.testing.assert_array_equal(np.asarray(timestep.reward), np.asarray(aux.gained))
         assert timestep.reward.shape == (MAX_AGENTS,)
@@ -91,7 +97,7 @@ class TestStepEnv:
         params = make_params()
         bank = make_init_bank(SEEDS, params)
         _, state = reset(jax.random.key(0), bank, params)
-        timestep, _ = step_env(state, deposit_action(), params)
+        timestep, _ = step_env(jax.random.key(0), state, deposit_action(), params)
         np.testing.assert_array_equal(np.asarray(timestep.alive),
                                       np.asarray(state.agents[AGENT_ALIVE]))
 
@@ -102,7 +108,7 @@ class TestStepEnv:
         bank = make_init_bank([1], params)
         _, state = reset(jax.random.key(0), bank, params)
 
-        timestep, _ = step_env(state, deposit_action(1.), params)
+        timestep, _ = step_env(jax.random.key(0), state, deposit_action(1.), params)
         assert float(timestep.terminated.sum()) == float(timestep.alive.sum()) > 0
         # ...though wiping out the population does truncate the world
         assert bool(timestep.truncated)
@@ -112,7 +118,7 @@ class TestStepEnv:
         bank = make_init_bank([1], params)
         _, state = reset(jax.random.key(0), bank, params)
         for _ in range(5):
-            timestep, state = step_env(state, deposit_action(), params)
+            timestep, state = step_env(jax.random.key(0), state, deposit_action(), params)
             assert not bool(timestep.truncated)
 
     def test_truncates_at_the_step_limit(self):
@@ -121,7 +127,7 @@ class TestStepEnv:
         _, state = reset(jax.random.key(0), bank, params)
         flags = []
         for _ in range(3):
-            timestep, state = step_env(state, deposit_action(), params)
+            timestep, state = step_env(jax.random.key(0), state, deposit_action(), params)
             flags.append(bool(timestep.truncated))
         assert flags == [False, False, True]
 
@@ -176,6 +182,80 @@ class TestAutoReset:
         assert bool(timestep.truncated)
         assert float(state.agents[AGENT_ALIVE].sum()) > 0.      # repopulated
         assert int(state.step) == 0
+
+
+class TestMediumNoise:
+    """Per-step medium noise, and the bias trap that shapes its design."""
+
+    def test_off_by_default_and_rng_free(self):
+        """A clean run must be bit-identical regardless of key -- the physics
+        core stays deterministic, which is what keeps both engines comparable."""
+        params = make_params()
+        bank = make_init_bank([1], params)
+        _, state = reset(jax.random.key(0), bank, params)
+        first, _ = step_env(jax.random.key(0), state, deposit_action(.2), params)
+        second, _ = step_env(jax.random.key(999), state, deposit_action(.2), params)
+        np.testing.assert_array_equal(np.asarray(first.obs.medium),
+                                      np.asarray(second.obs.medium))
+
+    def test_on_makes_the_world_stochastic(self):
+        params = make_params(stochastic_medium=True, food_noise=.25, comm_noise=.05)
+        bank = make_init_bank([1], params)
+        _, state = reset(jax.random.key(0), bank, params)
+        first, _ = step_env(jax.random.key(0), state, deposit_action(.2), params)
+        second, _ = step_env(jax.random.key(999), state, deposit_action(.2), params)
+        assert not np.allclose(np.asarray(first.obs.medium), np.asarray(second.obs.medium))
+
+    def test_food_noise_is_mean_preserving(self):
+        """The trap: additive-then-clipped noise *creates food from nothing*.
+
+        On an empty cell it turns negative draws into 0 and positive draws into
+        free resource, so a "harder" world is really a richer one. This inverted
+        a whole robustness experiment before being caught, which is why food
+        noise is multiplicative.
+        """
+        params = make_params(stochastic_medium=True, food_noise=.25, comm_noise=0.)
+        bank = make_init_bank([1], params)
+        _, state = reset(jax.random.key(0), bank, params)
+
+        clean = np.asarray(state.medium[MEDIUM_FOOD])
+        samples = [np.asarray(perturb_medium(jax.random.key(k), state.medium,
+                                             params)[MEDIUM_FOOD])
+                   for k in range(200)]
+        assert np.mean(samples) == pytest.approx(clean.mean(), rel=2e-3)
+
+    def test_food_noise_cannot_create_food(self):
+        params = make_params(stochastic_medium=True, food_noise=.5, comm_noise=0.)
+        bank = make_init_bank([1], params)
+        _, state = reset(jax.random.key(0), bank, params)
+        medium = state.medium.at[MEDIUM_FOOD].set(0.)
+
+        perturbed = perturb_medium(jax.random.key(0), medium, params)
+        assert float(perturbed[MEDIUM_FOOD].max()) == 0.
+
+    def test_comm_noise_can_fabricate_signal(self):
+        """Deliberately *not* multiplicative: a corrupted channel has to be able
+        to produce false positives, not merely attenuate real messages."""
+        params = make_params(stochastic_medium=True, food_noise=0., comm_noise=.1)
+        bank = make_init_bank([1], params)
+        _, state = reset(jax.random.key(0), bank, params)
+        medium = state.medium.at[MEDIUM_CHEM].set(0.)
+
+        perturbed = perturb_medium(jax.random.key(0), medium, params)
+        assert float(perturbed[MEDIUM_CHEM].max()) > 0.
+
+    def test_channels_stay_physical(self):
+        params = make_params(stochastic_medium=True, food_noise=.5, comm_noise=.5)
+        bank = make_init_bank([1], params)
+        _, state = reset(jax.random.key(0), bank, params)
+        perturbed = perturb_medium(jax.random.key(0), state.medium, params)
+
+        # concentrations, so never negative -- feeding on debt would be worse
+        assert float(perturbed[MEDIUM_FOOD].min()) >= 0.
+        assert float(perturbed[MEDIUM_CHEM].min()) >= 0.
+        # the agent-presence channel is bookkeeping, not a measurement
+        np.testing.assert_array_equal(np.asarray(perturbed[0]),
+                                      np.asarray(state.medium[0]))
 
 
 class TestCompiles:

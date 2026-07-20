@@ -327,13 +327,23 @@ class TestParamsSplit:
         return rollout
 
     def test_only_continuous_scalars_are_traced(self):
+        """Named rather than counted, so adding a field is a deliberate choice.
+
+        A shape-affecting field left traced does not fail here -- it fails much
+        later inside ``jit``, with a tracer error that points nowhere useful.
+        """
+        import dataclasses
+
         config = make_config()
-        leaves = jax.tree.leaves(config)
-        # rate_feed, rate_decay_chem, diffuse_sigma, 2x cost_weights,
-        # wave_scale, wave_decay -- and nothing that sets a shape
-        assert len(leaves) == 7
+        traced = [field.name for field in dataclasses.fields(config)
+                  if field.metadata.get('pytree_node', True)]
+        assert traced == ['rate_feed', 'rate_decay_chem', 'diffuse_sigma',
+                          'cost_weights', 'wave_scale', 'wave_decay',
+                          'food_noise', 'comm_noise']
+        # cost_weights is one field but two leaves
+        assert len(jax.tree.leaves(config)) == len(traced) + 1
         for static in (config.field_size, config.max_agents, config.boundary):
-            assert static not in leaves
+            assert static not in jax.tree.leaves(config)
 
     def test_traced_change_does_not_recompile(self):
         """The whole point: a population of configs costs one compilation."""

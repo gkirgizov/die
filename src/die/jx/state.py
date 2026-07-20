@@ -103,6 +103,13 @@ class EnvParams(struct.PyTreeNode):
     #: xarray engine leaves episode length to ``Simulation.run``. It lives here
     #: because the RL interface auto-resets, and so has to know.
     max_steps: int | None = struct.field(pytree_node=False, default=None)
+    #: Enables per-step medium noise (see ``food_noise`` / ``comm_noise``).
+    #: A static gate rather than "nonzero scale means on", so that a run without
+    #: noise pays nothing: the perturbation would otherwise draw two full
+    #: ``[W, H]`` normal fields per world step just to multiply them by zero.
+    #: Also has no xarray twin -- noise is applied by the RL interface layer, so
+    #: the physics core stays RNG-free and bit-comparable across both engines.
+    stochastic_medium: bool = struct.field(pytree_node=False, default=False)
     wave_dt: float = struct.field(pytree_node=False, default=0.01)
     wave_t_bounds: tuple[float, float] = struct.field(pytree_node=False, default=(0.0, 10.0))
     #: Half-length of the diffusion kernel. ``None`` derives it from
@@ -118,6 +125,18 @@ class EnvParams(struct.PyTreeNode):
     cost_weights: tuple[float, float] = (0.02, 0.01)
     wave_scale: float = 0.5
     wave_decay: float = 0.5
+    #: Relative standard deviation of *multiplicative* per-step noise on the
+    #: food channel -- a resource whose level fluctuates rather than sitting
+    #: still, so a policy cannot memorize one field. Multiplicative because food
+    #: is reward and the perturbation must not create it; see
+    #: :func:`die.jx.interface.perturb_medium`. Requires ``stochastic_medium``.
+    food_noise: float = 0.0
+    #: Standard deviation of additive per-step noise on the chemical channel.
+    #: This is the signal-to-noise ratio of the *communication medium*: chem is
+    #: the only route by which information reaches a distant agent, so raising
+    #: this degrades cooperation specifically, rather than perception in general.
+    #: Requires ``stochastic_medium``.
+    comm_noise: float = 0.0
 
     def __post_init__(self):
         # Pin the kernel radius at construction, while sigma is still a concrete
