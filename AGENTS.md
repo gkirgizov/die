@@ -3,7 +3,8 @@
 Orientation for anyone (human or agent) doing R&D here. It deliberately stays
 at the level of architecture, invariants and conventions — the things that
 save time and don't go stale. For research direction and roadmap, see
-[docs/NOTES.md](docs/NOTES.md).
+[docs/NOTES.md](docs/NOTES.md); dated experimental findings and lessons live
+in [docs/JOURNAL.md](docs/JOURNAL.md).
 
 ## What this is
 
