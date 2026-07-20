@@ -119,9 +119,16 @@ logic.
   bootstraps at the rollout boundary; `TimeStep` keeps `terminated` and
   `truncated` separate precisely so this stays visible.
 - **RL numbers on this benchmark need seed averaging.** Held-out return varies
-  by ±2.3 across seeds at an effect size of ~+0.9, so a single-seed result can
+  by ±1.2–2.7 across seeds at effect sizes of ~+2, so a single-seed result can
   read as 2× the baseline or as no effect. Pinned-seed thresholds in
-  `tests/behavior/` are regression guards, not evidence.
+  `tests/behavior/` are regression guards, not evidence. Two published findings
+  have already been retracted for resting on one seed (docs/JOURNAL.md).
+- **A learning rate belongs to the (algorithm, objective) pair, not to the
+  env.** Each configuration here peaks at a different rate — vendored
+  `per_agent` at 1e-3, vendored `joint` at 3e-3, rejax at 1e-3 — and rejax run
+  at the vendored default of 1e-2 looks catastrophically unstable while at 1e-3
+  it is the best result on the branch. Tune per configuration before comparing,
+  or the comparison measures the tuning.
 
 ## Workflow
 

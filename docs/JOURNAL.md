@@ -51,43 +51,79 @@ after `food_infinite=True`; the do-nothing baseline caught both.
 So the cross-check runs on the sparse grid and rejax eats ~80% dead action
 dimensions rather than have the benchmark bent to suit it.
 
-### Finding: the convolutional prior, not the PPO implementation, is decisive
+### Finding: the convolutional prior is decisive; the MLP is unusable
 
-Same rejax loss, same env, only the network differs:
+Same rejax loss, same env, `lr=1e-3`, 3 seeds — only the network differs:
 
-| network | untrained | trained |
-|---|---|---|
-| conv trunk (ours, substituted into rejax) | 3.4 | −20.5 ± 18.2 |
-| rejax stock MLP over the flattened field | −25.3 | −32.8 ± 0.8 |
+| network | trained |
+|---|---|
+| conv trunk (ours, substituted into rejax) | **6.22 ± 1.35** |
+| rejax stock MLP over the flattened field | **−32.51 ± 0.68** |
 
-The MLP never approaches the baseline. Caveat kept explicit: the two also differ
-in output-layer initialization (ours uses a small-gain orthogonal final layer),
-and the MLP's untrained score of −25 shows that init alone already costs it —
-so this measures "conv trunk as configured", not convolution in isolation.
+The largest and tightest effect measured anywhere on this branch. The MLP sees
+the flattened field and has to learn locality from scratch across a
+`3 × max_agents` action head; it never approaches the baseline on any seed.
+Caveat kept explicit: the two also differ in output-layer initialization (ours
+uses a small-gain orthogonal final layer) and the untrained MLP already scores
+≈ −25, so this measures "conv trunk as configured", not convolution alone.
 
-### Finding: single-seed RL numbers on this benchmark are not trustworthy
+### Finding: the learning rate was mis-calibrated, and it inverted a conclusion
 
-Re-measuring across 3 seeds instead of 1:
+Every number in the first draft of this entry was wrong, from one mistake:
+rejax was run at 1e-2, the rate calibrated for the *vendored* path. Sweeping it
+properly (2 seeds, held-out return, baseline 2.68):
 
-| setup | untrained | trained (3 seeds) |
-|---|---|---|
-| vendored, `per_agent` | 2.88 | **3.76 ± 2.34** |
-| vendored, `joint` | 2.88 | −2.05 ± 6.08 |
-| rejax, conv (`joint` only) | 3.42 | −20.50 ± 18.17 |
+| lr | vendored `per_agent` | vendored `joint` | rejax conv (`joint`) |
+|---|---|---|---|
+| 3e-4 | 2.13 ± 2.11 | 1.31 ± 2.17 | 6.22 ± 0.79 |
+| 1e-3 | **4.39 ± 1.41** | −0.10 ± 0.14 | **7.06 ± 0.79** |
+| 3e-3 | 4.27 ± 1.80 | **4.03 ± 0.41** | 5.67 ± 1.46 |
+| 1e-2 | 3.21 ± 2.70 | 2.19 ± 1.24 | −14.28 ± 19.47 |
 
-**Partial retraction.** The 5.46/5.91 figures in the earlier entry and in PR #6
-are seed-0 results; the seed-averaged effect is real but much smaller (+0.88
-over untrained, ±2.34) and `test_ppo_beats_doing_nothing` passes on a pinned
-seed rather than on a robust claim. Nothing about the *mechanism* changes —
-`per_agent` is still the only configuration that does not degrade — but the
-magnitude was overstated and any future comparison here needs seed averaging.
+rejax is not unstable — 1e-2 is simply past its edge. Each configuration has its
+own optimum, and comparing two of them at a third one's tuned rate measures
+nothing. **Lesson: a learning rate is a property of the (algorithm, objective)
+pair, not of the environment.**
 
-**Cross-check verdict:** the two implementations agree on the thing that
-matters and it is not flattering to either. Restricted to the joint objective,
-neither reliably beats inaction. The axis worth spending R&D on is the
-factorization (per-agent credit), not the choice of PPO implementation — which
-is exactly what a cross-check is for: it moved the suspicion off our vendored
-loss and onto the objective.
+**Retraction of the earlier `lr = 1e-2` finding.** That default came from a
+single-seed sweep. Across seeds 1e-3 beats it for `per_agent` too (4.39 ± 1.41
+vs 3.21 ± 2.70), so `HyperParams.learning_rate = 1e-2` is very likely wrong.
+Left unchanged here because moving it silently recalibrates the `rl-ppo`
+behavior thresholds; flagged for a deliberate follow-up.
+
+### Finding: per-agent credit buys much less than the design claimed
+
+Confirmation at 3 seeds, each configuration at *its own* best rate:
+
+| setup | lr | trained | vs baseline 2.68 |
+|---|---|---|---|
+| rejax, conv (`joint`) | 1e-3 | **6.22 ± 1.35** | 2.3× |
+| vendored, `per_agent` | 1e-3 | 4.68 ± 1.22 | 1.7× |
+| vendored, `joint` | 3e-3 | 4.56 ± 0.82 | 1.7× |
+| rejax, stock MLP | 1e-3 | −32.51 ± 0.68 | — |
+
+Two things follow, both awkward for the parent PR:
+
+1. **`per_agent` ≈ `joint` (4.68 vs 4.56, overlapping spread).** The premise
+   that per-agent factorization is worth "~10⁵× more signal per unit of
+   simulation" does not show up in held-out return at this scale and budget.
+   The extra signal is real; the *effective* sample size evidently is not —
+   agents in one world are coupled through the medium, exactly as the design
+   notes predicted, and that coupling appears to eat the gain. Worth testing at
+   larger `num_envs` before concluding anything stronger.
+2. **rejax leads our vendored PPO by ~1.5 on the shared objective**, with seed
+   spreads that overlap. Suggestive, not established. The most plausible
+   mechanism is architectural rather than algorithmic: our `ActorCritic` shares
+   one conv trunk between policy and value heads, while rejax builds separate
+   networks — and in `joint` mode the value target is a *sum* over ~50 agents,
+   so its squared error is orders of magnitude larger and can swamp the policy
+   gradient through the shared trunk.
+
+**Cross-check verdict:** it did the job a cross-check exists to do, twice. It
+caught a mis-calibrated learning rate that had inverted a conclusion, and it
+put a specific, testable defect hypothesis on our own implementation. What it
+did *not* do is confirm the design premise — the per-agent objective, the whole
+reason for vendoring, is currently indistinguishable from the joint one.
 
 ### Note: what adapting to a single-agent library actually costs
 

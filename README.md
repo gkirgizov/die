@@ -82,8 +82,11 @@ uv run pytest tests/behavior/test_rl_rejax_crosscheck.py -m slow
 ```
 
 It is a cross-check rather than an alternative — rejax speaks single-agent
-gymnax, which forces the weaker joint objective — and what it found is recorded
-in the journal: the factorization matters far more than the implementation.
+gymnax, so it can only consume the joint objective. What it found is recorded in
+[docs/JOURNAL.md](docs/JOURNAL.md), and it was not what the design predicted:
+the convolutional prior dominates everything (an MLP on the same loss never
+approaches the baseline), while the per-agent objective — the whole reason for
+vendoring a PPO — is currently indistinguishable from the joint one.
 
 It is one policy instantiated across a population of locations, not a
 multi-agent system: a convolution *is* a shared policy over local receptive
