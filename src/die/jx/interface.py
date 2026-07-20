@@ -39,6 +39,8 @@ from die.jx.env import agent_cells, init_state, step_with_aux
 from die.jx.state import (
     AGENT_ALIVE,
     AGENT_FOOD,
+    AGENT_X,
+    AGENT_Y,
     MEDIUM_CHEM,
     MEDIUM_FOOD,
     EnvParams,
@@ -61,11 +63,20 @@ class Obs:
         so the observation is self-sufficient: a convolutional policy produces a
         field and each agent has to gather from it at its own position, and
         rederiving that outside would mean handing the policy raw state.
+    :param coords: ``[2, max_agents]`` the real-valued (x, y) positions ``cells``
+        is rounded from. Redundant for a convolutional policy, which only ever
+        gathers at its own cell -- but the scripted agents in
+        :mod:`die.jx.scripted` sense at an *offset* from where they stand, and
+        the offsets they use (~0.03) are smaller than the rounding error that
+        ``cells`` has already thrown away (0.5/(width-1)). Reconstructing
+        position from ``cells`` would therefore pick a different sensing cell
+        than the xarray originals do, so the sub-cell position has to survive.
     """
 
     medium: jax.Array
     agent: jax.Array
     cells: jax.Array
+    coords: jax.Array
 
 
 @struct.dataclass
@@ -95,7 +106,8 @@ def get_obs(state: EnvState, params: EnvParams) -> Obs:
     ix, iy = agent_cells(state.agents, params)
     return Obs(medium=state.medium,
                agent=state.agents[jnp.array([AGENT_FOOD, AGENT_ALIVE])],
-               cells=jnp.stack([ix, iy]))
+               cells=jnp.stack([ix, iy]),
+               coords=state.agents[AGENT_X:AGENT_Y + 1])
 
 
 def make_init_bank(seeds, params: EnvParams) -> EnvState:

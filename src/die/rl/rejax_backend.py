@@ -96,6 +96,14 @@ def flatten_obs(obs: Obs) -> jax.Array:
     ``[medium | agent | cells]``, in that order. ``cells`` are grid indices and
     are carried as float here purely because the observation must be one array;
     :func:`unflatten_obs` casts them back before they are used to gather.
+
+    :attr:`Obs.coords` is deliberately **not** packed, even though it is part of
+    the observation elsewhere. This vector is what rejax's stock MLP baseline
+    consumes *directly*, so widening it would add ``2 * max_agents`` inputs --
+    512 on the 16x16 world -- and silently invalidate the calibration in
+    ``docs/JOURNAL.md`` and ``tests/behavior/test_rl_rejax_crosscheck.py``. It
+    would buy nothing: no policy on this path senses at an offset, so none of
+    them reads ``coords``.
     """
     return jnp.concatenate([obs.medium.ravel(),
                             obs.agent.ravel(),
@@ -112,7 +120,16 @@ def unflatten_obs(flat: jax.Array, params: EnvParams) -> Obs:
     cells = flat[medium_size + 2 * agents:].reshape(2, agents)
     # Indices survive the float round-trip exactly: they are small integers and
     # float32 is exact well past any plausible field size.
-    return Obs(medium=medium, agent=agent, cells=cells.astype(jnp.int32))
+    #
+    # `coords` is reconstructed as the *cell centres*, because the flat vector
+    # does not carry it (see flatten_obs). That loses sub-cell position, which
+    # is safe here and nowhere else: an offset-sensing agent needs the true
+    # position -- its offsets are smaller than this rounding error -- but no
+    # policy on the rejax path senses at an offset. See the Obs.coords docstring.
+    cells = cells.astype(jnp.int32)
+    coords = jnp.stack([cells[0] / max(width - 1, 1),
+                        cells[1] / max(height - 1, 1)]).astype(jnp.float32)
+    return Obs(medium=medium, agent=agent, cells=cells, coords=coords)
 
 
 class DiePopulationEnv(Environment):

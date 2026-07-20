@@ -161,13 +161,26 @@ def _wave_field(t: jax.Array, config: EnvParams) -> jax.Array:
     return (1 - mix) * z_waves + mix * z_islands
 
 
-def agent_cells(agents: jax.Array, config: EnvParams) -> tuple[jax.Array, jax.Array]:
-    """Maps real-valued agent coords to array indices (xarray 'nearest')."""
-    ix = jnp.round(agents[AGENT_X] * (config.width - 1)).astype(jnp.int32)
-    iy = jnp.round(agents[AGENT_Y] * (config.height - 1)).astype(jnp.int32)
+def cells_at(coords: jax.Array, config: EnvParams) -> tuple[jax.Array, jax.Array]:
+    """Maps real-valued ``[2, N]`` coords to array indices (xarray 'nearest').
+
+    Split out from :func:`agent_cells` because the scripted agents sense at an
+    *offset* from where they stand, so they need the same rounding rule applied
+    to coordinates that are not the agents' own -- and a second copy of that
+    rule is exactly how the two engines would drift apart. Out-of-range coords
+    clip rather than wrap, matching what ``sel(method='nearest')`` does when an
+    offset pushes a lookup past the edge of the grid.
+    """
+    ix = jnp.round(coords[0] * (config.width - 1)).astype(jnp.int32)
+    iy = jnp.round(coords[1] * (config.height - 1)).astype(jnp.int32)
     ix = jnp.clip(ix, 0, config.width - 1)
     iy = jnp.clip(iy, 0, config.height - 1)
     return ix, iy
+
+
+def agent_cells(agents: jax.Array, config: EnvParams) -> tuple[jax.Array, jax.Array]:
+    """Maps real-valued agent coords to array indices (xarray 'nearest')."""
+    return cells_at(agents[AGENT_X:AGENT_Y + 1], config)
 
 
 def step_with_aux(state: EnvState,
