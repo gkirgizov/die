@@ -1,0 +1,54 @@
+from typing import Any
+
+from die.agents.base import Agent
+from die.data_init import DataInitializer
+from die.types import ActType, ObsType
+from die.utils import save_args
+
+
+class ConstAgent(Agent):
+    def __init__(self, delta_xy: tuple[float, float], deposit: float = 0.):
+        delta_xy = tuple(delta_xy)  # normalize for JSON save/load round-trip
+        self._init_params = save_args(self.__init__, locals())
+        self._data = {'dx': delta_xy[0],
+                      'dy': delta_xy[1],
+                      'deposit1': deposit}
+
+    @property
+    def init_params(self) -> dict[str, Any]:
+        return self._init_params
+
+    def forward(self, obs: ObsType) -> ActType:
+        agents, medium = obs
+
+        # at each agent location write our const vector
+        action = DataInitializer.init_action_for(agents)
+        for chan in action.coords['channel'].values:
+            action.loc[dict(channel=chan)] = self._data[chan]
+
+        return action
+        # return self.postprocess_action(agents, action)
+
+
+class BrownianAgent(Agent):
+    def __init__(self, move_scale: float = 0.01, deposit_scale: float = 0.5):
+        self._init_params = save_args(self.__init__, locals())
+        self._scale = move_scale
+        self._dep_scale = deposit_scale
+
+    @property
+    def init_params(self) -> dict[str, Any]:
+        return self._init_params
+
+    def forward(self, obs: ObsType) -> ActType:
+        agents, medium = obs
+
+        s = self._scale
+        action = DataInitializer.action_for(agents) \
+            .with_noise('dx', -s, s) \
+            .with_noise('dy', -s, s) \
+            .with_noise('deposit1', 0., self._dep_scale) \
+            .build_agents()
+
+        return action
+        # return self.postprocess_action(agents, action)

@@ -2,6 +2,8 @@
 
 **DIE** is an Artificial Life project aimed at reproducing emergence of distributed intelligence under environmental pressures using learning cellular automata models.
 
+The name is also the objective function: whatever fails to cooperate — dies.
+
 ----
 
 It implements nature-like **[Gym](https://github.com/Farama-Foundation/Gymnasium) environment** with essential pressures for foraging, feeding, *not-dying*, together with **distributed agents** for solving it. Agents are a kind of learning cellular automata, hence they're *cooperative* (share the policy), observation and action spaces are *continuous*, and computations are *vectorized* for efficiency.
@@ -16,55 +18,66 @@ Left pane shows environment with food (green), agents (red) and their pheromone 
 
 This is a Physarum (slime mold) agent that communicates found food by releasing the pheromone and moves towards zones with more pheromone. Thanks to this information sharing between particles Physarum agent is much more efficient than Brownian agent in finding and consuming food.
 
-### Quick Start
+## Quick Start
 
-Minimal example for running an agent in the environment with default settings:
-```python
-def run_minimal(agent: Agent, agent_ratio=0.1, field_size=(256, 256), iters=300):
-  # Setup the environment
-  dynamics = Dynamics(init_agent_ratio=agent_ratio)
-  env = Env(field_size, dynamics)
-  plotter = InteractivePlotter.get(env, agent)
+Requires Python ≥ 3.12 and [uv](https://docs.astral.sh/uv/):
 
-  total_reward = 0
-  obs = env._get_current_obs
-  for i in (pbar := tqdm.trange(iters)):
-    # Step: action & observation
-    action = agent.forward(obs)
-    obs, reward, _, _, stats = env.step(action)
-    total_reward += reward
-    # Visualisation & logging
-    pbar.set_postfix(total_reward=np.round(total_reward, 3))
-    plotter.draw()
+```bash
+uv sync --all-extras
+
+die run --agent physarum                    # watch a slime mold emerge, live
+die record --agent brownian --out samples/  # save a GIF, no display needed
+die train --generations 100                 # evolve a Neural CA agent from scratch
+die replay runs/latest/checkpoints/best.pt  # watch what evolution came up with
 ```
 
-To reproduce the GIF-s above you can run it with following agents:
-```python
-run_minimal(BrownianAgent(move_scale=0.01))
+The same from Python — the whole loop is three objects (see `examples/minimal_run.py`):
 
-run_minimal(PhysarumAgent(max_agents=256*256,
-                          scale=0.007,
-                          turn_angle=30,
-                          sense_offset=0.04))
+```python
+from die import AgentId, DynamicsId, Simulation, make_agent, make_env
+from die.view import InteractiveViewObserver
+
+env = make_env(DynamicsId.st_perlin, field_size=256)
+agent = make_agent(AgentId.physarum, field_size=256)
+result = Simulation(env, agent, seed=42,
+                    observers=[InteractiveViewObserver()]).run(300)
 ```
 
-More example, including this one, can be found in `examples` directory.
+## Learning
 
-### Features
+`die train` evolves a **Neural Cellular Automata** agent with evolution strategies — no gradients, just variation and selection: kernels that feed their agents get to stay. Fitting, for a project called DIE.
+
+Every run is tracked with **MLflow**: full config, per-generation fitness, model checkpoints, and rollout animations of the current best agent.
+
+```bash
+mlflow ui --backend-store-uri sqlite:///runs/latest/mlflow.db
+```
+
+## Features
 
 - **Artificial Life system** with environmental pressures and agents' needs.
 - **Natural rewards** for effective feeding and staying alive.
 - **Gym environment** in the format of multi-channel 2D data arrays. Agents can sense (read) certain channels and can act (write to) other channels.
 - **Agent implementations** for Physarum, Gradient, Constant, and Brownian motion behaviors.
+- **Learning agents**: evolutionary Neural Cellular Automata.
 - **Controlled dynamics** of the environment.
-- **Dynamic visualisation** of environments (see GIFs above).
-- (TBD) *Learning agents*.
-- (TBD) *Flexible environment builder* with arbitrary data channels.
-- (TBD) *Easily reproducible experiments* thanks to saving & loading of experiment setup (all parameters of environments & agents)
+- **Dynamic visualisation** of environments (see GIFs above), recorded with `die record`.
+- **Reproducible experiments**: seeded runs, agent serialization, MLflow tracking.
 
 The environmental pressure is designed in such a way so that agents must learn to collectively predict environmental dynamics to be able to thrive. Otherwise their resources deplete, and they die.
 
-### Background
+## Development
+
+```bash
+uv sync --all-extras --dev
+uv run pytest                # fast: unit + behavioral invariants
+uv run pytest -m slow        # the full training pipeline
+uv run ruff check .
+```
+
+Behavioral claims are tested, not just told: Physarum must out-forage Brownian motion by a calibrated margin, and a short evolution run must actually improve fitness (`tests/behavior/`). The architecture map lives in [AGENTS.md](AGENTS.md); research notes and the roadmap in [docs/NOTES.md](docs/NOTES.md).
+
+## Background
 
 The project embodies several sources of inspiration:
 - **Embodied Intelligence** assumption.
@@ -76,15 +89,14 @@ The project embodies several sources of inspiration:
 - **Free Energy Principle & Active Inference.**
   It refers to a theory describing how intelligent behavior arises from the prior needs (aims) and predictive capabilities of agents.
 
-
-### Milestones
+## Milestones
 
 1. [x] Basic environment with Brownian motion agent.
 2. [x] Physarum agent.
-3. [ ] Neural Cellular Automata agent based on evolutionary approach.
+3. [x] Neural Cellular Automata agent based on evolutionary approach.
 4. [ ] Neural Cellular Automata agent based on Active Inference. 
 
-### Literature & Sources
+## Literature & Sources
 
 - Mordvintsev, A. et al. (2020) Growing Neural Cellular Automata. Distill. [Link to semantic scholar.](https://api.semanticscholar.org/CorpusID:213719058)
 - Parr, T., Pezzulo, G., & Friston, K.J. (2022). Active Inference. [Link to semantic scholar.](https://api.semanticscholar.org/CorpusID:247833519)
