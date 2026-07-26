@@ -64,6 +64,22 @@ class Dynamics:
 
     # Initialization options
     init_agent_ratio: float = 0.1
+    #: Abundance of the initial food field: a plain multiplier on the perlin
+    #: patches. The scarce-to-rich axis of an environment family.
+    food_scale: float = 1.0
+    #: Perlin frequency of the food field -- few octaves give large smooth
+    #: basins, many give fine speckle. The patchiness axis.
+    food_octaves: int = 8
+    #: Upper mask on the raw perlin field; see
+    #: :meth:`die.data_init.DataInitializer.with_food_perlin`.
+    food_threshold: float = 1.0
+
+    # Resource renewal
+    #: Logistic regrowth rate. 0 (the default) leaves food non-renewable, which
+    #: is what every result measured before this existed assumed.
+    regrow_rate: float = 0.0
+    #: Carrying capacity the regrowth saturates at.
+    food_capacity: float = 1.0
 
 
 class Env(gym.Env[ObsType, ActType]):
@@ -83,7 +99,9 @@ class Env(gym.Env[ObsType, ActType]):
     def _init_data(self, field_size: tuple[int, int]):
         self.medium = DataInitializer(field_size, DataChannels.medium) \
             .with_const('env_food', 0.5) \
-            .with_food_perlin(threshold=1.0, octaves=8) \
+            .with_food_perlin(threshold=self.dynamics.food_threshold,
+                              octaves=self.dynamics.food_octaves,
+                              scale=self.dynamics.food_scale) \
             .with_agents(ratio=self.dynamics.init_agent_ratio) \
             .build(name='medium')
         self.buffer_medium = self.medium.copy(deep=True)
@@ -185,7 +203,28 @@ class Env(gym.Env[ObsType, ActType]):
     def _medium_resource_dynamics(self):
         """Defines agent-independent inflow & outflow of resource."""
         food_ind = dict(channel='env_food')
-        self.medium.loc[food_ind] = self.dynamics.op_food_flow(self.medium.loc[food_ind])
+        food = self.dynamics.op_food_flow(self.medium.loc[food_ind])
+        self.medium.loc[food_ind] = self._regrow(food)
+
+    def _regrow(self, food):
+        """Logistic regrowth -- the twin of :func:`die.jx.env.regrow_food`.
+
+        ``food += rate * food * (1 - food / capacity)``: renewable resource,
+        fastest at half capacity and self-limiting at it. Deterministic, which
+        is why it belongs in the physics rather than in the noise layer.
+
+        It cannot revive a cell that reached exactly zero -- the term is
+        proportional to what is already there. That is a real property of
+        logistic growth, not an oversight, and it is why stochastic
+        reappearance is a separate mechanism
+        (:func:`die.jx.interface.respawn_food`) rather than a bigger rate here.
+
+        Written unconditionally, matching the JAX twin verbatim: there the rate
+        is a tracer and cannot be branched on at all. At rate 0 the added term
+        is identically zero, so both engines run one formula.
+        """
+        capacity = self.dynamics.food_capacity
+        return food + self.dynamics.regrow_rate * food * (1. - food / capacity)
 
     def _agent_move_handle_boundary(self, coords_array: da.DataArray) -> da.DataArray:
         bound = self.dynamics.boundary

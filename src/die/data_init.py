@@ -28,10 +28,28 @@ class FieldSequence(Sequence[np.ndarray]):
                           scale: float = 1.0,
                           decay: float = 0.0,
                           ) -> FoodOperator:
+        """Food that drifts: existing resource decays toward a travelling wave.
+
+        The wave term is a cosine mixture and so is signed. It is clipped at
+        zero here because the channel it writes to is *food* -- a resource that
+        is eaten and paid for -- and a negative level inverts the meaning of
+        every quantity downstream: feeding on a negative cell drains the agent,
+        the env's own deduction adds resource back, and "food consumed" stops
+        being defined. Measured before the clip existed: with scale=decay=0.5
+        the 16x16 world went from +16.1 total food to -9.6 within five steps,
+        with cells reaching -1.24, so this was the common case rather than an
+        edge one.
+
+        Clipping is what makes the wave a moving *resource* rather than a
+        signed potential field. No parameter choice avoids it: the wave
+        oscillates negative by construction and the steady state is
+        ``scale * wave / decay``, so any ``decay > 0`` drives troughs below
+        zero.
+        """
         it = iter(self)
 
         def food_flow(current):
-            return scale * next(it) + (1 - decay) * current
+            return np.maximum(scale * next(it) + (1 - decay) * current, 0.)
 
         return food_flow
 
@@ -222,9 +240,25 @@ class DataInitializer:
         # self._channels['agent_food'] = agents * self._get_random(0.1, 0.2)
         return self
 
-    def with_food_perlin(self, threshold: float = 0.25, octaves: int = 8):
-        self._channels['env_food'] = self._mask(self._get_perlin(octaves=octaves),
-                                                mask_above=threshold)
+    def with_food_perlin(self, threshold: float = 0.25, octaves: int = 8,
+                         scale: float = 1.0):
+        """Perlin-patterned food field.
+
+        The three knobs are deliberately orthogonal, so an environment family
+        can vary one at a time:
+
+        - ``scale`` multiplies the surviving field, and is the *abundance* axis.
+          It is the only one of the three that leaves the spatial pattern
+          untouched: the same patches, more or less food in them.
+        - ``octaves`` sets perlin's frequency, and is the *patchiness* axis --
+          few octaves give large smooth basins, many give fine speckle. Agents
+          that follow gradients care about this far more than about abundance.
+        - ``threshold`` masks cells whose raw noise exceeds it. Note this clips
+          from *above*, so lowering it removes the richest cells and punches
+          holes in the peaks rather than uniformly thinning the field.
+        """
+        self._channels['env_food'] = scale * self._mask(self._get_perlin(octaves=octaves),
+                                                        mask_above=threshold)
         return self
 
     def with_chem(self, threshold: float = 0.1):

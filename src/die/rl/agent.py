@@ -83,7 +83,8 @@ class RLAgent(Agent):
             medium=jnp.asarray(medium.values, dtype=jnp.float32),
             agent=jnp.asarray(agents.sel(channel=['agent_food', 'alive']).values,
                               dtype=jnp.float32),
-            cells=jnp.stack([jnp.asarray(ix), jnp.asarray(iy)]))
+            cells=jnp.stack([jnp.asarray(ix), jnp.asarray(iy)]),
+            coords=jnp.asarray(coords, dtype=jnp.float32))
         if self._init_params['normalize_obs'] and self.normalizer is not None:
             jx_obs = self.normalizer.apply(jx_obs)
 

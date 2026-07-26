@@ -44,13 +44,22 @@ class HyperParams:
     """Everything traced. Sweep by stacking these and ``vmap``-ing ``train``."""
 
     # --- optimization --------------------------------------------------------
-    #: Deliberately ~30x the usual PPO default. Measured on the 16x16 world at
-    #: 150 iterations: 3e-4 does not move the policy at all (return -2.7 -> -2.9,
-    #: approx_kl ~3e-5), 1e-3 learns slowly, 1e-2 is best on every seed tried,
-    #: and 3e-2 is noisier without being better. The reward here is dense and
-    #: per-agent-per-step, and an iteration sees ~10^5 agent transitions, so
+    #: Deliberately well above the usual PPO default: the reward here is dense
+    #: and per-agent-per-step, and an iteration sees ~10^5 agent transitions, so
     #: gradient estimates are far less noisy than the single-agent regime those
-    #: defaults come from.
+    #: defaults come from. 3e-4 does not move the policy at all on the 16x16
+    #: world (return -2.7 -> -2.9, approx_kl ~3e-5).
+    #:
+    #: **This default is very likely wrong and is kept only for continuity.**
+    #: The 1e-2 it encodes came from a single-seed sweep, which docs/JOURNAL.md
+    #: retracts: across three seeds 1e-3 beats it for `per_agent` too, 4.39 +/-
+    #: 1.41 against 3.21 +/- 2.70. Prefer 1e-3, which is what
+    #: die.bench.canonical and the rejax cross-check both train at. Changing the
+    #: default is deliberately left alone -- it would silently move every
+    #: existing calibration that was measured against it.
+    #:
+    #: A rate belongs to the (algorithm, objective) pair, not to the env; see
+    #: the tuned per-configuration values in tests/behavior.
     learning_rate: float = 1e-2
     clip_eps: float = 0.2
     value_coef: float = 0.5

@@ -39,6 +39,8 @@ from die.jx.env import agent_cells, init_state, step_with_aux
 from die.jx.state import (
     AGENT_ALIVE,
     AGENT_FOOD,
+    AGENT_X,
+    AGENT_Y,
     MEDIUM_CHEM,
     MEDIUM_FOOD,
     EnvParams,
@@ -61,11 +63,20 @@ class Obs:
         so the observation is self-sufficient: a convolutional policy produces a
         field and each agent has to gather from it at its own position, and
         rederiving that outside would mean handing the policy raw state.
+    :param coords: ``[2, max_agents]`` the real-valued (x, y) positions ``cells``
+        is rounded from. Redundant for a convolutional policy, which only ever
+        gathers at its own cell -- but the scripted agents in
+        :mod:`die.jx.scripted` sense at an *offset* from where they stand, and
+        the offsets they use (~0.03) are smaller than the rounding error that
+        ``cells`` has already thrown away (0.5/(width-1)). Reconstructing
+        position from ``cells`` would therefore pick a different sensing cell
+        than the xarray originals do, so the sub-cell position has to survive.
     """
 
     medium: jax.Array
     agent: jax.Array
     cells: jax.Array
+    coords: jax.Array
 
 
 @struct.dataclass
@@ -95,7 +106,8 @@ def get_obs(state: EnvState, params: EnvParams) -> Obs:
     ix, iy = agent_cells(state.agents, params)
     return Obs(medium=state.medium,
                agent=state.agents[jnp.array([AGENT_FOOD, AGENT_ALIVE])],
-               cells=jnp.stack([ix, iy]))
+               cells=jnp.stack([ix, iy]),
+               coords=state.agents[AGENT_X:AGENT_Y + 1])
 
 
 def make_init_bank(seeds, params: EnvParams) -> EnvState:
@@ -165,6 +177,36 @@ def perturb_medium(key: jax.Array, medium: jax.Array, params: EnvParams) -> jax.
                  .at[MEDIUM_CHEM].set(jnp.maximum(chem, 0.))
 
 
+def respawn_food(key: jax.Array, medium: jax.Array, params: EnvParams) -> jax.Array:
+    """Fresh patches of food appearing at random cells.
+
+    The missing half of a renewable resource. Logistic regrowth
+    (:func:`die.jx.env.regrow_food`) multiplies what is already present, so a
+    cell foraged to exactly zero stays dead forever no matter how large the
+    rate -- an environment made only of regrowth ratchets monotonically toward
+    empty wherever agents have been, which is the same static world with extra
+    steps. Reappearance has to be able to create resource where there is none,
+    and creating something from nothing needs a distribution.
+
+    Bernoulli arrivals per cell per step, which is the discrete-time Poisson
+    process: each cell independently gains ``respawn_amount`` with probability
+    ``respawn_rate``. Independent per cell, so patches are unstructured -- a
+    deliberately different spatial statistic from the perlin field agents were
+    initialized on, and from the wave, which moves resource without creating it.
+
+    Lives here rather than in the physics core for the same reason
+    ``perturb_medium`` does: the core is deliberately RNG-free so the two
+    engines stay bit-comparable. The cost is the same too -- this has no xarray
+    twin, so a policy trained under respawn replays in a world without it.
+    """
+    if not params.stochastic_respawn:
+        return medium
+
+    arrivals = jax.random.bernoulli(key, params.respawn_rate,
+                                    medium[MEDIUM_FOOD].shape)
+    return medium.at[MEDIUM_FOOD].add(arrivals * params.respawn_amount)
+
+
 def step_env(key: jax.Array,
              state: EnvState,
              action: jax.Array,
@@ -172,12 +214,19 @@ def step_env(key: jax.Array,
     """One step of raw physics, without auto-reset.
 
     ``action`` is ``[3, max_agents]`` -- (dx, dy, deposit1), already scaled into
-    world units by the caller. ``key`` drives medium noise only, and is unused
-    when ``stochastic_medium`` is off.
+    world units by the caller. ``key`` drives medium noise and resource
+    respawn, and is unused when both of their gates are off.
+
+    Respawn is applied after the perturbation, so a patch that has just
+    appeared is not immediately scaled by that step's multiplicative food
+    noise -- it arrives at its stated size, and fluctuates from the next step
+    onward like any other resource.
     """
+    noise_key, respawn_key = jax.random.split(key)
     next_state, _, aux = step_with_aux(state, action, params)
+    medium = perturb_medium(noise_key, next_state.medium, params)
     next_state = next_state.replace(
-        medium=perturb_medium(key, next_state.medium, params))
+        medium=respawn_food(respawn_key, medium, params))
 
     extinct = next_state.agents[AGENT_ALIVE].sum() == 0
     if params.max_steps is None:

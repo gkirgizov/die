@@ -77,7 +77,9 @@ def init_state(seed: int | None, config: EnvParams) -> EnvState:
 
     medium = DataInitializer(config.field_size, DataChannels.medium) \
         .with_const('env_food', 0.5) \
-        .with_food_perlin(threshold=1.0, octaves=8) \
+        .with_food_perlin(threshold=config.food_threshold,
+                          octaves=config.food_octaves,
+                          scale=config.food_scale) \
         .with_agents(ratio=config.init_agent_ratio) \
         .build(name='medium')
     agents = DataInitializer.agents_from_medium(medium, max_agents=config.max_agents)
@@ -159,13 +161,52 @@ def _wave_field(t: jax.Array, config: EnvParams) -> jax.Array:
     return (1 - mix) * z_waves + mix * z_islands
 
 
-def agent_cells(agents: jax.Array, config: EnvParams) -> tuple[jax.Array, jax.Array]:
-    """Maps real-valued agent coords to array indices (xarray 'nearest')."""
-    ix = jnp.round(agents[AGENT_X] * (config.width - 1)).astype(jnp.int32)
-    iy = jnp.round(agents[AGENT_Y] * (config.height - 1)).astype(jnp.int32)
+def cells_at(coords: jax.Array, config: EnvParams) -> tuple[jax.Array, jax.Array]:
+    """Maps real-valued ``[2, N]`` coords to array indices (xarray 'nearest').
+
+    Split out from :func:`agent_cells` because the scripted agents sense at an
+    *offset* from where they stand, so they need the same rounding rule applied
+    to coordinates that are not the agents' own -- and a second copy of that
+    rule is exactly how the two engines would drift apart. Out-of-range coords
+    clip rather than wrap, matching what ``sel(method='nearest')`` does when an
+    offset pushes a lookup past the edge of the grid.
+    """
+    ix = jnp.round(coords[0] * (config.width - 1)).astype(jnp.int32)
+    iy = jnp.round(coords[1] * (config.height - 1)).astype(jnp.int32)
     ix = jnp.clip(ix, 0, config.width - 1)
     iy = jnp.clip(iy, 0, config.height - 1)
     return ix, iy
+
+
+def agent_cells(agents: jax.Array, config: EnvParams) -> tuple[jax.Array, jax.Array]:
+    """Maps real-valued agent coords to array indices (xarray 'nearest')."""
+    return cells_at(agents[AGENT_X:AGENT_Y + 1], config)
+
+
+def regrow_food(food: jax.Array, config: EnvParams) -> jax.Array:
+    """Logistic regrowth -- the twin of :meth:`die.env.Env._regrow`.
+
+    ``food += rate * food * (1 - food / capacity)``: renewable resource,
+    fastest at half capacity and self-limiting there. Deterministic, and that
+    is why it belongs here rather than in the noise layer -- the physics core
+    stays RNG-free and bit-comparable across both engines, which is the
+    invariant that lets any of these results be cross-checked at all.
+
+    It provably cannot revive a cell at exactly zero, since the term is
+    proportional to what is already present. That is a property of logistic
+    growth rather than a gap, and it is precisely why reappearance is a
+    separate, stochastic mechanism (:func:`die.jx.interface.respawn_food`).
+
+    Computed unconditionally rather than skipped when the rate is zero.
+    ``regrow_rate`` is a *traced* leaf -- a continuous scalar that only ever
+    multiplies, exactly what :class:`~die.jx.state.EnvParams` says belongs on
+    that side so it can be swept under ``vmap`` -- and a Python ``if`` on a
+    tracer raises ``TracerBoolConversionError`` the moment params arrive as a
+    jit argument rather than a closed-over constant. At rate 0 the added term
+    is identically zero, so the guard bought a field of elementwise ops next to
+    a gaussian blur and cost jit-compatibility.
+    """
+    return food + config.regrow_rate * food * (1. - food / config.food_capacity)
 
 
 def step_with_aux(state: EnvState,
@@ -228,10 +269,17 @@ def step_with_aux(state: EnvState,
         num_ts = len(np.arange(*config.wave_t_bounds, config.wave_dt))
         t = (state.step % num_ts) * config.wave_dt
         flow = _wave_field(t, config)
-        medium = medium.at[MEDIUM_FOOD].set(
-            config.wave_scale * flow + (1 - config.wave_decay) * medium[MEDIUM_FOOD])
+        # Clipped at zero, mirroring WaveSequence.get_flow_operator: the wave
+        # term is a signed cosine mixture, and negative *food* inverts every
+        # quantity downstream -- feeding drains the agent and the env's own
+        # deduction adds resource back. See that docstring for the measurement.
+        medium = medium.at[MEDIUM_FOOD].set(jnp.maximum(
+            config.wave_scale * flow + (1 - config.wave_decay) * medium[MEDIUM_FOOD],
+            0.))
     elif config.food_flow != 'none':
         raise ValueError(f'Unknown food flow: {config.food_flow}')
+
+    medium = medium.at[MEDIUM_FOOD].set(regrow_food(medium[MEDIUM_FOOD], config))
 
     diffused = gaussian_blur_wrap(medium[MEDIUM_CHEM],
                                   config.diffuse_sigma, config.blur_radius)

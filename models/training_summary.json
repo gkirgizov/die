@@ -1,0 +1,86 @@
+{
+  "rl_ppo_seed0.msgpack": {
+    "kind": "ppo",
+    "seed": 0,
+    "heldout_return": 2.985286235809326,
+    "seconds": 38.1
+  },
+  "rl_ppo_seed1.msgpack": {
+    "kind": "ppo",
+    "seed": 1,
+    "heldout_return": 5.800992012023926,
+    "seconds": 39.3
+  },
+  "rl_ppo_seed2.msgpack": {
+    "kind": "ppo",
+    "seed": 2,
+    "heldout_return": 5.249643802642822,
+    "seconds": 39.8
+  },
+  "jx_nca_seed0.msgpack": {
+    "kind": "es",
+    "seed": 0,
+    "train_fitness": 8.79054069519043,
+    "heldout_return": 7.077769637107849,
+    "seconds": 2.7
+  },
+  "jx_nca_seed1.msgpack": {
+    "kind": "es",
+    "seed": 1,
+    "train_fitness": 9.123279571533203,
+    "heldout_return": 7.44193160533905,
+    "seconds": 2.1
+  },
+  "jx_nca_seed2.msgpack": {
+    "kind": "es",
+    "seed": 2,
+    "train_fitness": 9.511646270751953,
+    "heldout_return": 5.680012226104736,
+    "seconds": 2.1
+  },
+  "rl_ppo_dynamic_seed0.msgpack": {
+    "kind": "ppo",
+    "world": "dynamic",
+    "seed": 0,
+    "heldout_return": 3.782996654510498,
+    "seconds": 39.8
+  },
+  "rl_ppo_dynamic_seed1.msgpack": {
+    "kind": "ppo",
+    "world": "dynamic",
+    "seed": 1,
+    "heldout_return": 5.119445323944092,
+    "seconds": 41.2
+  },
+  "rl_ppo_dynamic_seed2.msgpack": {
+    "kind": "ppo",
+    "world": "dynamic",
+    "seed": 2,
+    "heldout_return": 3.6183128356933594,
+    "seconds": 40.9
+  },
+  "jx_nca_dynamic_seed0.msgpack": {
+    "kind": "es",
+    "world": "dynamic",
+    "seed": 0,
+    "train_fitness": 11.71391773223877,
+    "heldout_return": 8.352567195892334,
+    "seconds": 2.7
+  },
+  "jx_nca_dynamic_seed1.msgpack": {
+    "kind": "es",
+    "world": "dynamic",
+    "seed": 1,
+    "train_fitness": 11.699386596679688,
+    "heldout_return": 9.72157335281372,
+    "seconds": 2.2
+  },
+  "jx_nca_dynamic_seed2.msgpack": {
+    "kind": "es",
+    "world": "dynamic",
+    "seed": 2,
+    "train_fitness": 13.499380111694336,
+    "heldout_return": 9.087214469909668,
+    "seconds": 2.1
+  }
+}
