@@ -136,6 +136,9 @@ def train(dynamics: Annotated[DynamicsId, typer.Option(help='Environment dynamic
           field_size: FieldOpt = 96,
           agent_ratio: RatioOpt = 0.1,
           seed: SeedOpt = None,
+          backend: Annotated[str, typer.Option(
+              help="Search backend: 'evosax' (JAX, default) or 'evotorch' (torch).")]
+              = 'evosax',
           algorithm: Annotated[str, typer.Option(help="Search algorithm: 'pgpe' or 'cmaes'.")]
               = 'pgpe',
           out: Annotated[Path, typer.Option(help='Output directory for checkpoints, '
@@ -162,15 +165,13 @@ def train(dynamics: Annotated[DynamicsId, typer.Option(help='Environment dynamic
     _setup_logging(log_level)
     import os
 
-    try:
-        from die.train.evotorch_backend import EvotorchBackend
-    except ImportError as exc:
-        typer.echo(f'Error: {exc}', err=True)
-        raise typer.Exit(code=1) from exc
-    from die.train import EvolutionTrainer, MlflowTrainLogger, StdoutTrainLogger, TrainConfig
+    if backend not in ('evosax', 'evotorch'):
+        typer.echo(f"Error: unknown backend {backend!r}, expected 'evosax' or 'evotorch'",
+                   err=True)
+        raise typer.Exit(code=1)
+    from die.train import MlflowTrainLogger, StdoutTrainLogger, TrainConfig
 
     env = make_env(dynamics, field_size, agent_ratio=agent_ratio)
-    agent_obj = make_agent(AgentId.neural, field_size, seed=seed)
 
     config = TrainConfig(generations=generations,
                          episode_steps=episode_steps,
@@ -192,21 +193,50 @@ def train(dynamics: Annotated[DynamicsId, typer.Option(help='Environment dynamic
         typer.echo(f'MLflow tracking: {uri}\n'
                    f'  browse with: mlflow ui --backend-store-uri "{uri}"')
 
-    trainer = EvolutionTrainer(
-        env=env, agent=agent_obj,
-        backend=EvotorchBackend(algorithm=algorithm),
-        config=config, loggers=loggers,
-        run_context={'dynamics': str(dynamics), 'field_size': field_size,
-                     'agent_ratio': agent_ratio, 'agent': str(AgentId.neural)})
+    run_context = {'dynamics': str(dynamics), 'field_size': field_size,
+                   'agent_ratio': agent_ratio, 'agent': str(AgentId.neural),
+                   'backend': backend}
+    try:
+        if backend == 'evosax':
+            from die.jx.agent import JaxNCAAgent
+            from die.jx.factory import make_jx_config
+            from die.train.evosax_backend import EvosaxBackend
+            from die.train.jax_trainer import JaxEvolutionTrainer, jax_device_summary
+
+            typer.echo(f'JAX device: {jax_device_summary()}')
+            field = (field_size, field_size)
+            agent_obj = JaxNCAAgent.create(field, seed=seed, kernel_sizes=(3, 3),
+                                           scale=0.01, deposit=2.0)
+            trainer = JaxEvolutionTrainer(
+                env=env, agent=agent_obj,
+                backend=EvosaxBackend(algorithm=algorithm),
+                config=config,
+                jx_config=make_jx_config(dynamics, field_size, agent_ratio),
+                loggers=loggers, run_context=run_context)
+        else:
+            from die.train import EvolutionTrainer
+            from die.train.evotorch_backend import EvotorchBackend
+
+            agent_obj = make_agent(AgentId.neural, field_size, seed=seed)
+            trainer = EvolutionTrainer(
+                env=env, agent=agent_obj,
+                backend=EvotorchBackend(algorithm=algorithm),
+                config=config, loggers=loggers, run_context=run_context)
+    except ImportError as exc:
+        typer.echo(f'Error: {exc}', err=True)
+        raise typer.Exit(code=1) from exc
+
     trainer.train()
-    typer.echo(f'Best agent checkpoint: {out / "checkpoints" / "best.pt"}')
-    typer.echo(f'Replay it with: die replay {out / "checkpoints" / "best.pt"} '
+    checkpoint = out / 'checkpoints' / f'best{agent_obj.checkpoint_suffix}'
+    typer.echo(f'Best agent checkpoint: {checkpoint}')
+    typer.echo(f'Replay it with: die replay {checkpoint} '
                f'--dynamics {dynamics} --field-size {field_size}')
 
 
 @app.command()
-def replay(model: Annotated[Path, typer.Argument(help='Trained agent checkpoint (.pt).',
-                                                 exists=True, readable=True)],
+def replay(model: Annotated[Path, typer.Argument(
+               help='Trained agent checkpoint (.pt from evotorch, .msgpack from evosax).',
+               exists=True, readable=True)],
            dynamics: Annotated[DynamicsId, typer.Option(help='Environment dynamics preset.')]
                = DynamicsId.st_perlin_wide,
            steps: Annotated[int, typer.Option(min=1)] = 1000,

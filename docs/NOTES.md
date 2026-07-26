@@ -348,3 +348,82 @@ pinned) behind a generation-granular `SearcherBackend` seam. The intended follow
   QDax for MAP-Elites experiments once QD beckons.
 - Vetoed: EvoJAX (archived), nevergrad (dormant), EvoX (active but device-batch-only eval,
   no PGPE — wrong shape for this project).
+
+### Status: done (`die/jx/` + `EvosaxBackend`)
+
+The port landed as a *coexisting* core, not a replacement: `die/jx/` holds the pure-JAX
+env, a Flax NCA and a `vmap`/`scan` rollout, and drives training via `EvosaxBackend`
+(PGPE + ClipUp) behind the unchanged `SearcherBackend` seam. The xarray env remains the
+reference implementation and the substrate for scripted agents, the live view and replay.
+
+Measured: **30.7x** steady-state speedup per generation (CPU, 64x64 field, popsize 16,
+50 episode steps) — 4.73 s/gen evotorch vs 0.15 s/gen evosax. Reproduce with
+`uv run python benchmarks/bench_generation.py`. Within the predicted 10-50x band; CUDA
+at larger popsize is untested.
+
+Deviations from the plan above, each forced by a verified fact:
+
+- **dm-pix is not used.** `dm_pix.gaussian_blur` only supports SAME/VALID padding, but the
+  medium diffuses with periodic ('wrap') boundaries. The blur is hand-rolled instead
+  (separable, `jnp.pad(mode='wrap')`), replicating scipy's kernel radius rule exactly —
+  it matches `skimage.filters.gaussian` to float32 epsilon.
+- **evosax minimizes**; reward is maximized, so fitness is negated across the boundary.
+- **Collided deposits accumulate** in the JAX core (scatter-add), where the xarray env's
+  numpy `+=` keeps only the last write. This is the intended fix (cf. the feeding-collision
+  bug logged above), but it makes the two engines diverge exactly when agents share a cell:
+  ~0.3% on a 20-step neural rollout. Everything else matches to ~1e-7, pinned by
+  `tests/unit/test_jx_env.py::TestRolloutParity`.
+- Episodes do not terminate early on extinction (a dead population just earns zero), which
+  keeps the scan shape static; the sense mask (`apply_sense_mask`, off by default) is not ported.
+
+Consequence worth remembering: a JAX-trained agent *replays* in the xarray env, so training
+and replay physics differ slightly at collision cells.
+
+### Apple GPU (Metal): tested, not viable (Jul 2026)
+
+Tried on an M5 Pro (20 GPU cores, Metal 4). `jax-metal` is the only option and it does not
+work for this workload. Three independent blockers, in order of severity:
+
+1. **Binary incompatibility with the current stack.** `jax-metal` 0.1.1 (Oct 2024, ~21 months
+   stale, no release since) cannot run on jax 0.11 at all — even `jnp.ones` dies with
+   `unknown attribute code: 22 ... bytecode version 6 produced by StableHLO_v1.14.0`. The
+   plugin's PJRT binary predates the IR jax now emits.
+2. **Irreconcilable pins.** evosax 0.2 requires `jax>=0.5`; jax-metal is only usable around
+   its contemporary `jax==0.4.34`. There is no version satisfying both, so using Metal would
+   mean downgrading the whole stack ~2 years *and* rewriting the backend against the old
+   pre-0.2 evosax API.
+3. **The core pattern deadlocks anyway.** Even after downgrading to jax 0.4.34, where every
+   individual op we need works on Metal (scatter-add/max, wrap-pad, convolve, conv, scan,
+   vmap — all verified OK), the actual workload hangs. Isolated to a single construct:
+
+   | construct (64x64 field)                    | CPU    | Metal          |
+   |--------------------------------------------|--------|----------------|
+   | scan 50 x dynamic-index scatter            | 0.02 s | 0.02 s OK      |
+   | **vmap(16) over** that same scan           | 0.13 s | hangs (>300 s, 0% CPU) |
+
+   Batched scatter with data-dependent indices inside a scan is exactly what population
+   evaluation *is* here (agents deposit at their own moving positions, vmapped over the
+   population), so this is not something to code around.
+
+Conclusion: stay on CPU, where the port already gives ~30x and an M-series CPU is fast.
+Real GPU scaling means CUDA on Linux — see below.
+
+### NVIDIA GPU (CUDA): wired up, unmeasured
+
+`--extra train-cuda` installs `jax[cuda12]`, marked linux-x86_64 so it stays inert on
+macOS. torch 2.13 and jax-cuda12 0.11 resolve to one shared NVIDIA library set (cudnn
+9.24, cublas 12.9) — no conflict, but ~6 GB of wheels, which is why the CI extras are
+listed explicitly instead of `--all-extras`.
+
+**No GPU numbers yet: nothing here has run on one.** CI's `cuda-smoke` job proves the
+extra installs, coexists with torch's CUDA libraries, and that the training path still
+works when the plugin is present but finds no device (jax must fall back to CPU rather
+than crash) — everything except that kernels execute on a GPU, which a standard runner
+cannot test. The `cuda-gpu` job does the real thing (asserts a GPU backend, trains, and
+benchmarks) but needs a runner labelled `gpu` and is manual-dispatch only.
+
+Expectations to check when a GPU is available: the CPU path is already only ~0.15 s per
+generation at 64^2/popsize 16, so per-generation latency is dominated by kernel launches
+at that size — a GPU should win only once popsize or field size grows enough to fill it.
+`jx.device` is recorded in every tracked run, so a run that quietly fell back to CPU is
+identifiable after the fact.

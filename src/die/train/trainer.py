@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from die.agents.neural import TorchAgent
+from die.agents.base import Agent
 from die.env import Env
 from die.sim import Simulation
 from die.train.searcher import GenStats, SearcherBackend
@@ -42,7 +42,7 @@ class EvolutionTrainer:
 
     def __init__(self,
                  env: Env,
-                 agent: TorchAgent,
+                 agent: Agent,
                  backend: SearcherBackend,
                  config: TrainConfig,
                  loggers: Sequence[TrainLogger] = (),
@@ -68,7 +68,7 @@ class EvolutionTrainer:
         context = {f'run.{key}': str(value) for key, value in self.run_context.items()}
         return {**config, **agent_params, **backend_params, **context}
 
-    def evaluate(self, agent: TorchAgent) -> float:
+    def evaluate(self, agent: Agent) -> float:
         """Fitness: total episode reward on the shared env, headless."""
         sim = Simulation(self.env, agent, seed=self._current_eval_seed)
         result = sim.run(self.config.episode_steps)
@@ -81,10 +81,18 @@ class EvolutionTrainer:
             return self.config.seed
         return self.config.seed + 10007 * generation
 
-    def train(self) -> TorchAgent:
-        config = self.config
+    def _setup_backend(self) -> None:
+        """Binds the backend to this trainer's evaluation strategy.
+
+        Overridden by :class:`~die.train.jax_trainer.JaxEvolutionTrainer`,
+        which evaluates whole populations at once.
+        """
         self.backend.setup(self.agent, self.evaluate,
-                           popsize=config.popsize, seed=config.seed)
+                           popsize=self.config.popsize, seed=self.config.seed)
+
+    def train(self) -> Agent:
+        config = self.config
+        self._setup_backend()
         self.history = []
 
         for logger in self.loggers:
@@ -116,7 +124,9 @@ class EvolutionTrainer:
                 logger.close()
 
     def _save_checkpoint(self, tag: str) -> Path:
-        path = self.config.out_dir / 'checkpoints' / f'{tag}.pt'
+        # Torch agents serialize to '.pt', JAX ones to '.msgpack'.
+        suffix = getattr(self.agent, 'checkpoint_suffix', '.pt')
+        path = self.config.out_dir / 'checkpoints' / f'{tag}{suffix}'
         path.parent.mkdir(parents=True, exist_ok=True)
         self.backend.best_agent().save(path)
         return path
