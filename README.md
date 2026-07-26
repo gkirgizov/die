@@ -72,6 +72,22 @@ die rl --food-noise 0.25 --comm-noise 0.05     # a world that doesn't sit still
 die replay runs/latest/checkpoints/final.msgpack
 ```
 
+A second, independent PPO implementation lives behind the same environment:
+`die/rl/rejax_backend.py` runs it through [rejax](https://github.com/keraJLi/rejax),
+so the vendored loss has a witness that shares none of its code.
+
+```bash
+uv sync --extra train-rejax   # distrax pulls a TFP nightly; kept out of `train`
+uv run pytest tests/behavior/test_rl_rejax_crosscheck.py -m slow
+```
+
+It is a cross-check rather than an alternative — rejax speaks single-agent
+gymnax, so it can only consume the joint objective. What it found is recorded in
+[docs/JOURNAL.md](docs/JOURNAL.md), and it was not what the design predicted:
+the convolutional prior dominates everything (an MLP on the same loss never
+approaches the baseline), while the per-agent objective — the whole reason for
+vendoring a PPO — is currently indistinguishable from the joint one.
+
 It is one policy instantiated across a population of locations, not a
 multi-agent system: a convolution *is* a shared policy over local receptive
 fields. `--reward-share` sets whether an agent is rewarded for its own foraging
