@@ -4,6 +4,13 @@ Physics parity with the xarray env is the design constraint here; see
 ``tests/unit/test_jx_env.py`` for the pinned cross-implementation assertions.
 Two deliberate divergences are documented inline: scatter-add deposits and
 non-terminating episodes.
+
+The reward this module returns is the same scalar it always was. The per-agent
+vector behind it -- which is what reinforcement learning needs, and which
+``gained.sum()`` collapses away -- is available from :func:`step_with_aux`.
+Keeping the scalar signature intact is deliberate: a ``[max_agents]`` reward
+would *broadcast* rather than raise through ``Simulation``'s accumulator and
+``rollout``'s ``.sum()``, so the two shapes must not share a return type.
 """
 
 from __future__ import annotations
@@ -13,6 +20,7 @@ import random
 import jax
 import jax.numpy as jnp
 import numpy as np
+from flax import struct
 
 from die.data_init import DataInitializer
 from die.jx.state import (
@@ -26,13 +34,33 @@ from die.jx.state import (
     MEDIUM_AGENTS,
     MEDIUM_CHEM,
     MEDIUM_FOOD,
-    EnvConfig,
+    EnvParams,
     EnvState,
+    resolve_diffuse_radius,
 )
 from die.types import DataChannels
 
 
-def init_state(seed: int | None, config: EnvConfig) -> EnvState:
+@struct.dataclass
+class StepAux:
+    """Per-agent quantities that the scalar reward collapses away.
+
+    :param gained: ``[max_agents]`` energy change this step, already masked by
+        the pre-step alive state (dead slots contribute exactly 0).
+    :param alive: ``[max_agents]`` alive mask *before* the lifecycle stage --
+        the set of agents that actually acted, and therefore the set whose
+        transitions are real. This is the mask RL losses must reduce over.
+    :param died: ``[max_agents]`` 1.0 where an agent was alive at the start of
+        the step and is dead at the end. This is the per-agent terminal signal;
+        value bootstrapping must be cut here.
+    """
+
+    gained: jax.Array
+    alive: jax.Array
+    died: jax.Array
+
+
+def init_state(seed: int | None, config: EnvParams) -> EnvState:
     """Builds the initial world state on the host, then moves it to device.
 
     Initialization is intentionally *not* jitted: it reuses the existing
@@ -61,30 +89,42 @@ def init_state(seed: int | None, config: EnvConfig) -> EnvState:
     )
 
 
-def gaussian_kernel1d(sigma: float, truncate: float = 4.0) -> np.ndarray:
+def gaussian_kernel1d(sigma, radius: int) -> jax.Array:
     """1D gaussian kernel matching ``scipy.ndimage.gaussian_filter``.
 
     skimage's ``gaussian`` delegates to scipy with ``truncate=4.0``; replicating
     the radius rule and normalization exactly is what keeps chem1 within ~1e-6
     of the reference implementation.
+
+    ``radius`` is passed in rather than derived from sigma because it sets the
+    kernel's *shape*: deriving it here would make sigma shape-affecting, and so
+    impossible to ``vmap`` over. :attr:`~die.jx.state.EnvParams.blur_radius`
+    applies scipy's rule when a concrete sigma allows it.
+
+    The weights are computed in float32 (rather than the float64-then-cast the
+    host implementation used) so that a traced sigma works. Measured cost: the
+    blur moves from 1.2e-7 to 1.8e-7 away from skimage, against a 1e-6 parity
+    tolerance.
     """
-    radius = int(truncate * sigma + 0.5)
-    x = np.arange(-radius, radius + 1, dtype=np.float64)
-    kernel = np.exp(-(x ** 2) / (2.0 * sigma ** 2))
-    return (kernel / kernel.sum()).astype(np.float32)
+    x = jnp.arange(-radius, radius + 1, dtype=jnp.float32)
+    kernel = jnp.exp(-(x ** 2) / (2.0 * sigma ** 2))
+    return kernel / kernel.sum()
 
 
-def gaussian_blur_wrap(field: jax.Array, sigma: float) -> jax.Array:
+def gaussian_blur_wrap(field: jax.Array, sigma, radius: int | None = None) -> jax.Array:
     """Separable gaussian blur with periodic ('wrap') boundary.
 
     ``dm_pix.gaussian_blur`` only offers SAME/VALID padding, so the periodic
     case the env needs is hand-rolled: pad with ``mode='wrap'``, then two
     valid-mode 1D convolutions.
+
+    Leaving ``radius`` implicit applies scipy's rule to a concrete sigma; a
+    traced sigma requires passing it.
     """
-    kernel = jnp.asarray(gaussian_kernel1d(sigma))
-    radius = (kernel.shape[0] - 1) // 2
+    radius = resolve_diffuse_radius(sigma, radius)
     if radius == 0:
         return field
+    kernel = gaussian_kernel1d(sigma, radius)
 
     padded = jnp.pad(field, radius, mode='wrap')
     # Convolve along each axis in turn (separability).
@@ -94,7 +134,7 @@ def gaussian_blur_wrap(field: jax.Array, sigma: float) -> jax.Array:
     return blurred
 
 
-def _wave_field(t: jax.Array, config: EnvConfig) -> jax.Array:
+def _wave_field(t: jax.Array, config: EnvParams) -> jax.Array:
     """Closed-form port of :meth:`die.data_init.WaveSequence.__getitem__`.
 
     Evaluated inside the scan rather than precomputed: it is pure trigonometry,
@@ -119,7 +159,7 @@ def _wave_field(t: jax.Array, config: EnvConfig) -> jax.Array:
     return (1 - mix) * z_waves + mix * z_islands
 
 
-def agent_cells(agents: jax.Array, config: EnvConfig) -> tuple[jax.Array, jax.Array]:
+def agent_cells(agents: jax.Array, config: EnvParams) -> tuple[jax.Array, jax.Array]:
     """Maps real-valued agent coords to array indices (xarray 'nearest')."""
     ix = jnp.round(agents[AGENT_X] * (config.width - 1)).astype(jnp.int32)
     iy = jnp.round(agents[AGENT_Y] * (config.height - 1)).astype(jnp.int32)
@@ -128,11 +168,13 @@ def agent_cells(agents: jax.Array, config: EnvConfig) -> tuple[jax.Array, jax.Ar
     return ix, iy
 
 
-def step(state: EnvState, action: jax.Array, config: EnvConfig) -> tuple[EnvState, jax.Array]:
-    """One world step. ``action`` is ``[3, max_agents]`` (dx, dy, deposit1).
+def step_with_aux(state: EnvState,
+                  action: jax.Array,
+                  config: EnvParams) -> tuple[EnvState, jax.Array, StepAux]:
+    """One world step, also reporting the per-agent quantities.
 
-    Substage order matches the xarray env exactly -- each leaves the world
-    valid for the next.
+    ``action`` is ``[3, max_agents]`` (dx, dy, deposit1). Substage order matches
+    the xarray env exactly -- each leaves the world valid for the next.
     """
     medium, agents = state.medium, state.agents
     alive = agents[AGENT_ALIVE]
@@ -178,6 +220,9 @@ def step(state: EnvState, action: jax.Array, config: EnvConfig) -> tuple[EnvStat
         have_food = agents[AGENT_FOOD] > 1e-4
         agents = agents * have_food     # zeroes all channels of dead slots
 
+    # Alive *after* the lifecycle stage, so `died` marks this step's terminals.
+    died = alive * (1.0 - agents[AGENT_ALIVE])
+
     # --- Medium dynamics stage ----------------------------------------------
     if config.food_flow == 'wave':
         num_ts = len(np.arange(*config.wave_t_bounds, config.wave_dt))
@@ -188,11 +233,23 @@ def step(state: EnvState, action: jax.Array, config: EnvConfig) -> tuple[EnvStat
     elif config.food_flow != 'none':
         raise ValueError(f'Unknown food flow: {config.food_flow}')
 
-    diffused = gaussian_blur_wrap(medium[MEDIUM_CHEM], config.diffuse_sigma)
+    diffused = gaussian_blur_wrap(medium[MEDIUM_CHEM],
+                                  config.diffuse_sigma, config.blur_radius)
     medium = medium.at[MEDIUM_CHEM].set(diffused * (1.0 - config.rate_decay_chem))
 
     # NB: divergence from Simulation -- an extinct population is not terminated
     # early, it simply yields zero reward forever. Fitness-equivalent, and it
     # keeps the episode shape static for `lax.scan`.
     reward = gained.sum()
-    return EnvState(medium=medium, agents=agents, step=state.step + 1), reward
+    aux = StepAux(gained=gained, alive=alive, died=died)
+    return EnvState(medium=medium, agents=agents, step=state.step + 1), reward, aux
+
+
+def step(state: EnvState, action: jax.Array, config: EnvParams) -> tuple[EnvState, jax.Array]:
+    """One world step. ``action`` is ``[3, max_agents]`` (dx, dy, deposit1).
+
+    Returns the *scalar* episode reward contribution, as it always has. Use
+    :func:`step_with_aux` when the per-agent breakdown is needed.
+    """
+    next_state, reward, _ = step_with_aux(state, action, config)
+    return next_state, reward

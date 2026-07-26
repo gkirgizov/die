@@ -3,7 +3,8 @@
 Orientation for anyone (human or agent) doing R&D here. It deliberately stays
 at the level of architecture, invariants and conventions — the things that
 save time and don't go stale. For research direction and roadmap, see
-[docs/NOTES.md](docs/NOTES.md).
+[docs/NOTES.md](docs/NOTES.md); dated experimental findings and lessons live
+in [docs/JOURNAL.md](docs/JOURNAL.md).
 
 ## What this is
 
@@ -40,6 +41,15 @@ logic.
   (~30x/generation). It *coexists* with the xarray env rather than
   replacing it — parity is pinned by tests, with one deliberate divergence
   (collided deposits accumulate here, last-write-wins there).
+- **`rl/`**: PPO on the JAX core. Where evolution sees one scalar per episode,
+  this consumes every agent's per-step energy change (`jx/interface.py` exposes
+  reward/terminals as `[max_agents]` arrays). One conv policy instantiated
+  across a population of locations — *not* multi-agent: no per-agent params, no
+  centralized critic. `make_train(static, bank)` returns a pure jittable
+  `train(key, hypers)`, so a population of configs is one `vmap`; that is what
+  the meta-learning phase will build on, and it is why the config splits into
+  static (shapes, counts) and traced (scalars) halves. `RLAgent` wears the
+  standard `Agent` interface, so replay/view/recording work unchanged.
 - **`train/`**: `EvolutionTrainer` evaluates candidates through the same
   `Simulation`, behind a generation-granular `SearcherBackend` seam. Two
   backends live behind it, each confined to its own module: `evosax` (JAX,
@@ -74,10 +84,28 @@ logic.
 - **Rendered channels are unbounded** (concentrations grow past 1); clip to
   display range before showing or encoding frames.
 - **Two engines, one physics**: any change to `env.py` must be mirrored in
-  `jx/env.py` (and vice versa) or the parity tests fail. `EnvConfig` is
-  static/hashable because it is baked into jit; `Dynamics` holds callables
-  and cannot be. Init stays host-side numpy so both engines share the
-  `DataInitializer` pipeline and agree seed-for-seed.
+  `jx/env.py` (and vice versa) or the parity tests fail. `Dynamics` holds
+  callables and cannot be static. Init stays host-side numpy so both engines
+  share the `DataInitializer` pipeline and agree seed-for-seed. RL-only
+  additions (`max_steps`, medium noise) live in `jx/interface.py` or as
+  explicitly-marked `EnvParams` fields, so the physics core stays RNG-free and
+  bit-comparable.
+- **`EnvParams` splits static from traced per field.** `pytree_node=False` for
+  anything setting a shape or picking a branch; everything else is a traced
+  leaf and can be swept. Getting this wrong is silent — it fails later, inside
+  `jit`, with a tracer error that points nowhere. Shape-derived values are
+  pinned at construction (`blur_radius`), not at use.
+- **A per-agent reward vector escapes silently.** `Simulation`'s
+  `total_reward += reward` and `rollout`'s `.sum()` both *work* with a
+  `[max_agents]` reward — broadcasting, no exception. So `jx/env.py::step`
+  keeps its scalar return and per-agent data travels via `StepAux`/`TimeStep`.
+- **Dead slots poison statistics, not just physics.** Mask by `alive` in every
+  reduction independently: loss, advantage normalization, GAE, and observation
+  statistics. Unmasked, the obs normalizer tracks the death rate rather than
+  the quantity being normalized.
+- **Validate the task before the learner.** A do-nothing baseline is one
+  rollout. Under `food_infinite=True` stillness out-earns foraging, so a
+  learner can "succeed" while learning nothing — see docs/JOURNAL.md.
 
 ## Workflow
 

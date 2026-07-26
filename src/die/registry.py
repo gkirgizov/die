@@ -140,9 +140,27 @@ def load_agent(path: str | PathLike) -> Agent:
 
 
 def _load_jax_agent(path: Path) -> Agent:
+    """Loads a msgpack checkpoint, dispatching on its embedded format marker.
+
+    Two trainers write msgpack: the evosax path ('die-jx-nca') and the PPO path
+    ('die-rl-ppo'). The suffix cannot tell them apart, so the payload does.
+    """
     try:
+        from flax import serialization
+
+        from die.jx.agent import CHECKPOINT_FORMAT as NCA_FORMAT
         from die.jx.agent import JaxNCAAgent
+        from die.rl.agent import CHECKPOINT_FORMAT as RL_FORMAT
+        from die.rl.agent import RLAgent
     except ImportError as exc:
         raise ImportError(
             f'Loading {path.name} needs the JAX stack: uv sync --extra train') from exc
-    return JaxNCAAgent.load(path)
+
+    with open(path, 'rb') as handle:
+        payload = serialization.msgpack_restore(handle.read())
+    fmt = payload.get('format')
+    if fmt == RL_FORMAT:
+        return RLAgent.load(path)
+    if fmt == NCA_FORMAT:
+        return JaxNCAAgent.load(path)
+    raise ValueError(f'{path.name}: unrecognized checkpoint format {fmt!r}')

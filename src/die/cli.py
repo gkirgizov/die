@@ -234,8 +234,111 @@ def train(dynamics: Annotated[DynamicsId, typer.Option(help='Environment dynamic
 
 
 @app.command()
+def rl(dynamics: Annotated[DynamicsId, typer.Option(help='Environment dynamics preset.')]
+           = DynamicsId.st_perlin,
+       iterations: Annotated[int, typer.Option(min=1, help='PPO update iterations.')] = 200,
+       num_envs: Annotated[int, typer.Option(min=1, help='Parallel worlds.')] = 8,
+       num_steps: Annotated[int, typer.Option(min=1, help='Rollout length per world.')] = 32,
+       num_epochs: Annotated[int, typer.Option(min=1)] = 2,
+       num_minibatches: Annotated[int, typer.Option(min=1)] = 4,
+       learning_rate: Annotated[float, typer.Option(min=0.,
+           help='Default 1e-2 -- ~30x the usual PPO value; see docs/JOURNAL.md.')] = 1e-2,
+       entropy_coef: Annotated[float, typer.Option(min=0.)] = 0.01,
+       reward_share: Annotated[float, typer.Option(min=0., max=1.,
+           help='0 rewards own gain only, 1 rewards the population mean.')] = 1.0,
+       survival_bonus: Annotated[float, typer.Option(min=0.,
+           help='Per-step reward for staying alive; needed when agents can die.')] = 0.0,
+       food_noise: Annotated[float, typer.Option(min=0., max=0.6,
+           help='Multiplicative food noise. Above ~0.6 the zero-clip biases '
+                'food upward and the world gets richer, not harder.')] = 0.0,
+       comm_noise: Annotated[float, typer.Option(min=0.,
+           help='Additive noise on the chemical channel -- the communication SNR knob.')] = 0.0,
+       features: Annotated[int, typer.Option(min=1, help='Conv trunk width.')] = 32,
+       num_blocks: Annotated[int, typer.Option(min=0, help='Residual blocks.')] = 2,
+       kernel_size: Annotated[int, typer.Option(min=1,
+           help='Sets the receptive field: 1 + (blocks + 1) * (kernel - 1).')] = 3,
+       factorization: Annotated[str, typer.Option(
+           help="'per_agent' (default) or 'joint' (the objective evolution optimizes).")]
+           = 'per_agent',
+       field_size: FieldOpt = 64,
+       agent_ratio: RatioOpt = 0.1,
+       seed: SeedOpt = None,
+       out: Annotated[Path, typer.Option(help='Run output directory.')] = Path('runs/latest'),
+       mlflow_experiment: Annotated[str, typer.Option(help='MLflow experiment name.')] = 'die',
+       mlflow_uri: Annotated[str | None, typer.Option(help='MLflow tracking URI.')] = None,
+       no_mlflow: Annotated[bool, typer.Option('--no-mlflow',
+                                               help='Disable MLflow tracking.')] = False,
+       record_steps: Annotated[int, typer.Option(min=0,
+           help='Steps in the final rollout animation; 0 disables.')] = 100,
+       log_level: LogLevelOpt = 'WARNING'):
+    """Train a policy with PPO on the vectorized JAX core.
+
+    Unlike `die train`, which evolves a 162-parameter kernel from one scalar per
+    episode, this learns from every agent's per-step energy change -- roughly
+    10^5 times more signal per unit of simulation, which is what makes a network
+    of this size trainable at all.
+    """
+    _setup_logging(log_level)
+    import os
+
+    from die.train import MlflowTrainLogger, StdoutTrainLogger
+
+    env = make_env(dynamics, field_size, agent_ratio=agent_ratio)
+
+    loggers: list = [StdoutTrainLogger()]
+    if not no_mlflow:
+        out.mkdir(parents=True, exist_ok=True)
+        uri = mlflow_uri or os.environ.get('MLFLOW_TRACKING_URI') \
+            or f'sqlite:///{(out / "mlflow.db").absolute()}'
+        loggers.append(MlflowTrainLogger(
+            experiment=mlflow_experiment, tracking_uri=uri,
+            artifact_location=str((out / 'mlartifacts').absolute())))
+        typer.echo(f'MLflow tracking: {uri}\n'
+                   f'  browse with: mlflow ui --backend-store-uri "{uri}"')
+
+    try:
+        from die.jx.factory import make_jx_config
+        from die.rl.config import HyperParams, TrainStatic
+        from die.rl.reward import RewardParams
+        from die.rl.trainer import RLRunConfig, RLTrainer
+        from die.train.jax_trainer import jax_device_summary
+
+        typer.echo(f'JAX device: {jax_device_summary()}')
+
+        env_params = make_jx_config(dynamics, field_size, agent_ratio)
+        if food_noise or comm_noise:
+            env_params = env_params.replace(stochastic_medium=True,
+                                            food_noise=food_noise,
+                                            comm_noise=comm_noise)
+        static = TrainStatic(num_envs=num_envs, num_steps=num_steps,
+                             num_iterations=iterations, num_epochs=num_epochs,
+                             num_minibatches=num_minibatches, features=features,
+                             num_blocks=num_blocks, kernel_size=kernel_size,
+                             factorization=factorization)
+        hypers = HyperParams(env=env_params, learning_rate=learning_rate,
+                             entropy_coef=entropy_coef,
+                             reward=RewardParams(share=reward_share,
+                                                 survival_bonus=survival_bonus))
+        trainer = RLTrainer(
+            env=env, static=static, hypers=hypers,
+            config=RLRunConfig(seed=seed, out_dir=out, record_steps=record_steps),
+            loggers=loggers,
+            run_context={'dynamics': str(dynamics), 'field_size': field_size,
+                         'agent_ratio': agent_ratio, 'algorithm': 'ppo'})
+    except (ImportError, ValueError) as exc:
+        typer.echo(f'Error: {exc}', err=True)
+        raise typer.Exit(code=1) from exc
+
+    trainer.train()
+    checkpoint = out / 'checkpoints' / 'final.msgpack'
+    typer.echo(f'Trained policy: {checkpoint}')
+    typer.echo(f'Replay it with: die replay {checkpoint} '
+               f'--dynamics {dynamics} --field-size {field_size}')
+
+
+@app.command()
 def replay(model: Annotated[Path, typer.Argument(
-               help='Trained agent checkpoint (.pt from evotorch, .msgpack from evosax).',
+               help='Trained agent checkpoint (.pt from evotorch, .msgpack from evosax/ppo).',
                exists=True, readable=True)],
            dynamics: Annotated[DynamicsId, typer.Option(help='Environment dynamics preset.')]
                = DynamicsId.st_perlin_wide,

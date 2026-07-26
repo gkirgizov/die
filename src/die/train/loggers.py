@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,13 +16,36 @@ if TYPE_CHECKING:
 log = logging.getLogger('die.train')
 
 
+@dataclass
+class IterStats:
+    """Per-iteration statistics from a gradient-based (RL) trainer.
+
+    The sibling of :class:`~die.train.searcher.GenStats`, which is ES-shaped
+    (best/mean/best-ever fitness). RL iterations report losses and returns
+    instead, and forcing those through GenStats would label a policy loss as a
+    ``fitness/`` metric. A free-form dict keeps the seam stable while the RL
+    metric set is still evolving.
+    """
+
+    iteration: int
+    metrics: dict[str, float] = field(default_factory=dict)
+
+
 class TrainLogger:
-    """No-op base class for training loggers: override what you need."""
+    """No-op base class for training loggers: override what you need.
+
+    ES trainers call :meth:`on_generation`; RL trainers call
+    :meth:`on_iteration`. A logger overrides whichever it understands and
+    inherits no-ops for the rest.
+    """
 
     def on_train_start(self, trainer: EvolutionTrainer) -> None:
         pass
 
     def on_generation(self, trainer: EvolutionTrainer, stats: GenStats) -> None:
+        pass
+
+    def on_iteration(self, trainer, stats: IterStats) -> None:
         pass
 
     def on_checkpoint(self, trainer: EvolutionTrainer, generation: int, path: Path) -> None:
@@ -39,13 +63,17 @@ class TrainLogger:
 
 
 class HistoryLogger(TrainLogger):
-    """Collects per-generation stats in memory (used by tests and notebooks)."""
+    """Collects per-generation/iteration stats in memory (tests, notebooks)."""
 
     def __init__(self):
         self.stats: list[GenStats] = []
+        self.iterations: list[IterStats] = []
 
     def on_generation(self, trainer: EvolutionTrainer, stats: GenStats) -> None:
         self.stats.append(stats)
+
+    def on_iteration(self, trainer, stats: IterStats) -> None:
+        self.iterations.append(stats)
 
 
 class StdoutTrainLogger(TrainLogger):
@@ -65,6 +93,15 @@ class StdoutTrainLogger(TrainLogger):
         self._bar.set_postfix(best=round(stats.best_fitness, 3),
                               mean=round(stats.mean_fitness, 3),
                               best_ever=round(stats.best_ever_fitness, 3))
+
+    def on_iteration(self, trainer, stats: IterStats) -> None:
+        if self._bar is None:
+            return
+        self._bar.update(1)
+        shown = {key.rsplit('/', 1)[-1]: round(value, 4)
+                 for key, value in stats.metrics.items()
+                 if key.endswith(('raw_return', 'approx_kl'))}
+        self._bar.set_postfix(**shown)
 
     def on_checkpoint(self, trainer, generation: int, path: Path) -> None:
         log.info('checkpoint saved: %s', path)
@@ -126,6 +163,13 @@ class MlflowTrainLogger(TrainLogger):
             **{f'fitness/{key}': value for key, value in stats.extra.items()},
         }
         mlflow.log_metrics(metrics, step=stats.generation)
+
+    def on_iteration(self, trainer, stats: IterStats) -> None:
+        # Metric names arrive already namespaced (e.g. 'rl/raw_return') --
+        # deliberately not reusing the 'fitness/' prefix, which the slow tests
+        # pin to ES semantics.
+        import mlflow
+        mlflow.log_metrics(stats.metrics, step=stats.iteration)
 
     def on_checkpoint(self, trainer, generation: int, path: Path) -> None:
         import mlflow
