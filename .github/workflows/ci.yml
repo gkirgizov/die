@@ -5,10 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # cuda-smoke is heavy, so it runs weekly and on demand rather than per push
+  # cuda-smoke is heavy, so it runs on demand rather than per push
   # (or per push when the commit message contains '[cuda]').
-  schedule:
-    - cron: '0 5 * * 1'
   workflow_dispatch:
 
 env:
@@ -59,7 +57,6 @@ jobs:
     timeout-minutes: 45
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule' ||
       contains(github.event.head_commit.message, '[cuda]')
     steps:
       - uses: actions/checkout@v4
@@ -93,7 +90,7 @@ jobs:
           tests/unit/test_jx_agent.py
           tests/unit/test_evosax_backend.py
 
-  # Manual/scheduled: the same smoke test on an actual GPU. Needs a runner
+  # Manual: the same smoke test on an actual GPU. Needs a runner
   # labelled `gpu` (self-hosted or a GitHub GPU runner) -- skipped otherwise.
   cuda-gpu:
     runs-on: [self-hosted, gpu]
